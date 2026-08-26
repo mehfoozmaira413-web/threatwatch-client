@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: "Courier New", Courier, monospace;
+  background: #030712; /* Dark mode default */
+  color: #ffffff;
+}
+
+.dark body {
+  background: #f3f4f6; /* Light mode background */
+  color: #111827;      /* Light mode text */
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}

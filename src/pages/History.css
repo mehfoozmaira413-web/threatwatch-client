@@ -1,0 +1,653 @@
+/* ==========================================
+   THREATWATCH AI - HISTORY PAGE
+========================================== */
+
+.history-page {
+  min-height: 100vh;
+  width: 100%;
+
+  background: #000;
+  color: #00ff41;
+
+  padding: 110px 40px 40px;
+
+  font-family: "Courier New", monospace;
+
+  box-sizing: border-box;
+}
+
+
+/* ==========================================
+   HEADER
+========================================== */
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+
+  margin-bottom: 35px;
+
+  gap: 20px;
+}
+
+.history-header h1 {
+  margin: 0;
+
+  font-size: 38px;
+  letter-spacing: 3px;
+
+  color: #00ff41;
+
+  text-shadow: 0 0 15px #00ff41;
+}
+
+.history-header p {
+  color: #fff;
+
+  margin-top: 8px;
+}
+
+
+/* ==========================================
+   BACK BUTTON
+========================================== */
+
+.back-btn {
+  padding: 12px 22px;
+
+  background: #00ff41;
+  color: #000;
+
+  border: none;
+  border-radius: 8px;
+
+  font-weight: bold;
+
+  cursor: pointer;
+
+  transition: 0.2s ease;
+}
+
+.back-btn:hover {
+  background: #00cc33;
+
+  transform: translateY(-1px);
+
+  box-shadow: 0 0 15px rgba(0, 255, 65, 0.5);
+}
+
+
+/* ==========================================
+   SEARCH + FILTER
+========================================== */
+
+.history-controls {
+  display: flex;
+
+  gap: 15px;
+
+  margin-bottom: 30px;
+}
+
+.history-controls input,
+.history-controls select {
+  padding: 14px;
+
+  background: #111;
+
+  color: #00ff41;
+
+  border: 1px solid #00ff41;
+
+  border-radius: 8px;
+
+  font-family: "Courier New", monospace;
+
+  outline: none;
+
+  box-sizing: border-box;
+}
+
+.history-controls input {
+  flex: 1;
+}
+
+.history-controls input::placeholder {
+  color: #777;
+}
+
+.history-controls input:focus,
+.history-controls select:focus {
+  box-shadow:
+    0 0 15px rgba(0, 255, 65, 0.4);
+
+  border-color: #00ff41;
+}
+
+.history-controls select {
+  min-width: 160px;
+
+  cursor: pointer;
+}
+
+
+/* ==========================================
+   SCAN LIST
+========================================== */
+
+.scan-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 18px;
+}
+
+
+/* ==========================================
+   SCAN CARD
+========================================== */
+
+.scan-card {
+  width: 100%;
+
+  background: #050505;
+
+  border: 1px solid #00ff41;
+
+  border-radius: 12px;
+
+  padding: 22px;
+
+  box-shadow:
+    0 0 18px rgba(0, 255, 65, 0.15);
+
+  transition:
+    0.3s ease;
+
+  box-sizing: border-box;
+}
+
+.scan-card:hover {
+  box-shadow:
+    0 0 30px rgba(0, 255, 65, 0.35);
+
+  transform: translateY(-2px);
+}
+
+
+/* ==========================================
+   URL + STATUS
+========================================== */
+
+.scan-top {
+  display: flex;
+
+  justify-content: space-between;
+
+  align-items: flex-start;
+
+  gap: 20px;
+}
+
+.scan-url {
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  color: #fff;
+
+  font-size: 18px;
+
+  min-width: 0;
+
+  word-break: break-all;
+}
+
+
+/* ==========================================
+   SCAN TYPE
+========================================== */
+
+.scan-type {
+  flex-shrink: 0;
+
+  padding: 5px 9px;
+
+  border: 1px solid #00ff41;
+
+  border-radius: 6px;
+
+  color: #00ff41;
+
+  background: rgba(0, 255, 65, 0.08);
+
+  font-size: 11px;
+
+  font-weight: bold;
+
+  letter-spacing: 1px;
+}
+
+
+/* URL TEXT */
+
+.scan-url-text {
+  word-break: break-all;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* ==========================================
+   STATUS
+========================================== */
+
+.status {
+  flex-shrink: 0;
+
+  font-weight: bold;
+
+  white-space: nowrap;
+}
+
+
+/* SAFE */
+
+.status.safe,
+.safe {
+  color: #00ff41;
+
+  text-shadow:
+    0 0 8px rgba(0, 255, 65, 0.6);
+}
+
+
+/* THREAT */
+
+.status.danger,
+.danger {
+  color: #ff1744;
+
+  text-shadow:
+    0 0 8px rgba(255, 23, 68, 0.5);
+}
+
+
+/* ==========================================
+   SCAN DETAILS
+========================================== */
+
+.scan-details {
+  display: flex;
+
+  gap: 45px;
+
+  margin-top: 20px;
+
+  flex-wrap: wrap;
+}
+
+.scan-details div {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 6px;
+}
+
+.scan-details span {
+  color: #888;
+
+  font-size: 12px;
+
+  letter-spacing: 1px;
+}
+
+.scan-details strong {
+  color: #00ff41;
+
+  font-size: 15px;
+}
+
+
+/* ==========================================
+   VERDICT
+========================================== */
+
+.scan-verdict {
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  margin-top: 20px;
+
+  padding-top: 15px;
+
+  border-top:
+    1px solid rgba(0, 255, 65, 0.12);
+}
+
+.scan-verdict span {
+  color: #888;
+
+  font-size: 12px;
+
+  letter-spacing: 1px;
+}
+
+.scan-verdict strong {
+  color: #00ff41;
+
+  font-size: 14px;
+
+  letter-spacing: 1px;
+}
+
+
+/* ==========================================
+   THREAT TAGS
+========================================== */
+
+.threat-tags {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 8px;
+
+  margin-top: 18px;
+}
+
+.threat-tags span {
+  border: 1px solid #ff1744;
+
+  color: #ff1744;
+
+  background: rgba(255, 23, 68, 0.05);
+
+  padding: 5px 10px;
+
+  border-radius: 20px;
+
+  font-size: 12px;
+
+  box-shadow:
+    0 0 6px rgba(255, 23, 68, 0.15);
+}
+
+
+/* ==========================================
+   SUMMARY
+========================================== */
+
+.scan-summary {
+  color: #ccc;
+
+  margin-top: 18px;
+
+  line-height: 1.5;
+
+  word-break: break-word;
+}
+
+
+/* ==========================================
+   DELETE ACTION AREA
+========================================== */
+
+.scan-actions {
+  display: flex;
+
+  justify-content: flex-end;
+
+  align-items: center;
+
+  width: 100%;
+
+  margin-top: 20px;
+
+  padding-top: 15px;
+
+  border-top:
+    1px solid rgba(0, 255, 65, 0.12);
+
+  box-sizing: border-box;
+}
+
+
+/* ==========================================
+   DELETE BUTTON
+========================================== */
+
+.delete-scan-btn {
+  display: inline-flex !important;
+
+  align-items: center;
+
+  justify-content: center;
+
+  min-width: 135px;
+
+  min-height: 42px;
+
+  padding: 10px 18px;
+
+  background: rgba(255, 23, 68, 0.10) !important;
+
+  color: #ff6478 !important;
+
+  border: 1px solid #ff1744 !important;
+
+  border-radius: 8px;
+
+  font-family: "Courier New", monospace;
+
+  font-size: 13px;
+
+  font-weight: bold;
+
+  letter-spacing: 0.5px;
+
+  cursor: pointer;
+
+  opacity: 1 !important;
+
+  visibility: visible !important;
+
+  position: relative;
+
+  z-index: 5;
+
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+
+/* DELETE BUTTON HOVER */
+
+.delete-scan-btn:hover {
+  background: rgba(255, 23, 68, 0.20) !important;
+
+  color: #ff1744 !important;
+
+  border-color: #ff1744 !important;
+
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 0 15px rgba(255, 23, 68, 0.35);
+}
+
+
+/* DELETE BUTTON ACTIVE */
+
+.delete-scan-btn:active {
+  transform: translateY(0);
+
+  box-shadow:
+    0 0 8px rgba(255, 23, 68, 0.25);
+}
+
+
+/* DELETE BUTTON DISABLED */
+
+.delete-scan-btn:disabled {
+  opacity: 0.6 !important;
+
+  cursor: not-allowed;
+
+  transform: none;
+
+  box-shadow: none;
+}
+
+
+/* ==========================================
+   EMPTY / LOADING MESSAGE
+========================================== */
+
+.history-message {
+  text-align: center;
+
+  padding: 80px;
+
+  color: #888;
+
+  font-size: 18px;
+}
+
+
+/* ==========================================
+   ERROR MESSAGE
+========================================== */
+
+.error-message {
+  color: #ff1744;
+
+  border: 1px solid rgba(255, 23, 68, 0.3);
+
+  background: rgba(255, 23, 68, 0.05);
+
+  border-radius: 10px;
+}
+
+
+/* ==========================================
+   MOBILE RESPONSIVE
+========================================== */
+
+@media (max-width: 700px) {
+
+  .history-page {
+    padding: 100px 20px 30px;
+  }
+
+
+  .history-header {
+    flex-direction: column;
+
+    align-items: flex-start;
+
+    gap: 20px;
+  }
+
+
+  .history-header h1 {
+    font-size: 28px;
+  }
+
+
+  .history-header p {
+    font-size: 14px;
+  }
+
+
+  .history-controls {
+    flex-direction: column;
+  }
+
+
+  .history-controls input,
+  .history-controls select {
+    width: 100%;
+
+    box-sizing: border-box;
+  }
+
+
+  .scan-top {
+    flex-direction: column;
+  }
+
+
+  .scan-url {
+    font-size: 15px;
+
+    flex-wrap: wrap;
+  }
+
+
+  .scan-details {
+    flex-direction: column;
+
+    gap: 15px;
+  }
+
+
+  .scan-card {
+    padding: 18px;
+  }
+
+
+  .scan-actions {
+    justify-content: stretch;
+  }
+
+
+  .delete-scan-btn {
+    width: 100%;
+  }
+
+}
+
+
+/* ==========================================
+   VERY SMALL SCREENS
+========================================== */
+
+@media (max-width: 400px) {
+
+  .history-page {
+    padding: 90px 12px 25px;
+  }
+
+
+  .history-header h1 {
+    font-size: 23px;
+
+    letter-spacing: 2px;
+  }
+
+
+  .scan-card {
+    padding: 15px;
+  }
+
+
+  .delete-scan-btn {
+    width: 100%;
+
+    min-height: 44px;
+  }
+
+}
