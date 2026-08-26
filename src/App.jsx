@@ -4,7 +4,8 @@ import { io } from "socket.io-client";
 import "./App.css";
 import Scanner from "./pages/Scanner";
 
-const API_URL = "http://localhost:5001";
+const API_URL =  "https://threatwatch-server-production.up.railway.app";
+;
 
 /* =========================================================
    HELPERS
