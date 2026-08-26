@@ -7,11 +7,10 @@ export default function Login({ setLoggedIn, setUser, setPage }) { // 🔥 3 pro
 
   const handleLogin = async () => {
     try {
-      const res = await axios.post("http://localhost:5001/api/auth/login", {email, password});
+      const res = await axios.post("https://threatwatch-server-production.up.railway.app/api/auth/login", {email, password});
       localStorage.setItem("token", res.data.token);
       localStorage.setItem("user", JSON.stringify(res.data.user));
-      import { connectSocket } from "./socket";
-      
+    
       setUser(res.data.user); // 🔥 App ko user do
       setLoggedIn(true); // 🔥 App ko batao login ho gaya
       setPage("dashboard"); // 🔥 Dashboard pe bhej do bina refresh ke

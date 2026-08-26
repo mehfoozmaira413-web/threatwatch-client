@@ -4,7 +4,7 @@ import axios from "axios";
 
 console.log("🔥 NEW ADMIN DASHBOARD FILE IS RUNNING");
 
-const API_URL = "http://localhost:5001";
+const API_URL = "https://threatwatch-server-production.up.railway.app";
 
 export default function AdminDashboard() {
   const [scans, setScans] = useState([]);

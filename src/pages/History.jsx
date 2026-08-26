@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./History.css";
 
-const API_URL = "http://localhost:5001";
+const API_URL = "https://threatwatch-server-production.up.railway.app";
 
 export default function History() {
   const [scans, setScans] = useState([]);

@@ -249,7 +249,7 @@ export default function Hero() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5001/api/scan",
+        "https://threatwatch-server-production.up.railway.app///api/scan",
         {
           url: url.trim(),
         },
@@ -294,7 +294,7 @@ export default function Hero() {
 
     try {
       const response = await axios.post(
-        "http://localhost:5001/api/scan/text",
+        "https://threatwatch-server-production.up.railway.app/api/scan/text",
         {
           text: text.trim(),
         },
@@ -373,7 +373,7 @@ export default function Hero() {
     reader.onload = async () => {
       try {
         const response = await axios.post(
-          "http://localhost:5001/api/scan/image",
+          "https://threatwatch-server-production.up.railway.app/api/scan/image",
           {
             image: reader.result,
             mimeType: image.type,

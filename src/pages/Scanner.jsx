@@ -11,7 +11,7 @@ import {
 import "./Scanner.css";
 
 const API_BASE =
-  "http://localhost:5001";
+  "https://threatwatch-server-production.up.railway.app1";
 
 function Scanner() {
   const [scanType, setScanType] =

@@ -58,7 +58,7 @@ function ModeratorPage() {
 
           const response =
             await fetch(
-              "http://localhost:5001/api/moderator/dashboard",
+              "https://threatwatch-server-production.up.railway.app1/api/moderator/dashboard",
               {
                 headers: {
                   Authorization:

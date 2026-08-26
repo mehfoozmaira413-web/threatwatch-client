@@ -8,7 +8,7 @@ export default function Signup() {
 
   const handleSignup = async () => {
     try {
-      await axios.post("http://localhost:5001/api/auth/register", {name, email, password});
+      await axios.post("https://threatwatch-server-production.up.railway.app/api/auth/register", {name, email, password});
       alert("Signup Success! Ab Login karo");
       window.location.href = "/login";
     } catch {

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { Trash2 } from "lucide-react"; // icon add kiya
 
-const API_URL = "http://localhost:5001"; // <-- 5001 KIYA
+const API_URL = "https://threatwatch-server-production.up.railway.app"; // <-- 5001 KIYA
 
 export default function ManageUsers() {
   const [users, setUsers] = useState([]);
