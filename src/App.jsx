@@ -2879,7 +2879,7 @@ function ModeratorPage({ realtimeTick }) {
 
   // NAYA: Permissions ke liye state
   const [permissions, setPermissions] = useState({
-    canFlag: true,
+    canFlag: false,
     canDelete: false
   });
   const [permLoading, setPermLoading] = useState(true);
@@ -3522,6 +3522,7 @@ function App() {
       safe: 0,
       threats: 0,
     });
+    const [permissions, setPermissions] = useState(null);
 
   const [
     realtimeTick,
@@ -3852,6 +3853,30 @@ function App() {
     isAdmin,
     isModerator,
   ]);
+
+  /* =====================================================
+   FETCH PERMISSIONS
+===================================================== */
+
+useEffect(() => {
+  if(!loggedIn || !getToken() || !role) return;
+
+  const loadPermissions = async () => {
+    try {
+      const response = await fetch(`${API_URL}/api/admin/permissions`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      const data = await readResponse(response);
+      if(response.ok && data.permissions) {
+        const myPerm = data.permissions.find(p => normalizeRole(p.role) === role);
+        setPermissions(myPerm?.permissions || {});
+      }
+    } catch(error) {
+      console.error("PERMISSIONS ERROR:", error);
+    }
+  };
+  loadPermissions();
+}, [loggedIn, role]);
 
   /* =====================================================
      THEME
