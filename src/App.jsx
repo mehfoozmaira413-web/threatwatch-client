@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { io } from "socket.io-client";
 import "./App.css";
 import Scanner from "./pages/Scanner";
+import axios from 'axios';
 
 const API_URL =  "https://threatwatch-server-production.up.railway.app";
 ;
@@ -2862,936 +2863,110 @@ function AboutPage({
     </main>
   );
 }
-
 /* =========================================================
    MODERATOR DASHBOARD
 ========================================================= */
 
-function ModeratorPage({
-  realtimeTick,
-}) {
-  const [scans, setScans] =
-    useState([]);
+function ModeratorPage({ realtimeTick }) {
+  const [scans, setScans] = useState([]);
+  const [flaggedScans, setFlaggedScans] = useState([]);
+  const [stats, setStats] = useState({ scans: 0, safe: 0, threats: 0, uncertain: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [flaggingScanId, setFlaggingScanId] = useState(null);
+  const [flagReason, setFlagReason] = useState("");
 
-    const [flaggedScans, setFlaggedScans] = useState([]);
-
-  const [stats, setStats] =
-    useState({
-      scans: 0,
-      safe: 0,
-      threats: 0,
-      uncertain: 0,
-    });
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [query, setQuery] =
-    useState("");
-    const [flaggingScanId, setFlaggingScanId] =
-  useState(null);
-
-const [flagReason, setFlagReason] =
-  useState("");
+  // NAYA: Permissions ke liye state
+  const [permissions, setPermissions] = useState({
+    canFlag: true,
+    canDelete: false
+  });
+  const [permLoading, setPermLoading] = useState(true);
 
   // =====================================================
-// FLAG SCAN AS THREAT
-// =====================================================
+  // 1. PERMISSIONS FETCH KARO PAGE LOAD PE
+  // =====================================================
+  useEffect(() => {
+    const fetchPermissions = async () => {
+      try {
+        const token = getToken();
+        if (!token) return;
 
-const handleFlagScan = async (scanId) => {
-  const reason = window.prompt(
-    "🚩 Why are you flagging this scan as a threat?"
-  );
+        const res = await axios.get(`${API_URL}/api/admin/permissions`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
 
-  // User cancelled
-  if (reason === null) {
-    return;
-  }
+        if (res.data.success) {
+          const modPerms = res.data.permissions.find(p => p.role === 'Moderator');
+          if (modPerms) {
+            setPermissions(modPerms.permissions);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch permissions", err);
+      } finally {
+        setPermLoading(false);
+      }
+    };
+    fetchPermissions();
+  }, []);
 
-  const cleanReason = reason.trim();
+  // =====================================================
+  // FLAG SCAN AS THREAT
+  // =====================================================
+  const handleFlagScan = async (scanId) => {
+    const reason = window.prompt("🚩 Why are you flagging this scan as a threat?");
+    if (reason === null) return;
 
-  if (!cleanReason) {
-    alert(
-      "Please enter a reason before flagging the scan."
-    );
-    return;
-  }
+    const cleanReason = reason.trim();
+    if (!cleanReason) {
+      alert("Please enter a reason before flagging the scan.");
+      return;
+    }
 
-  const token = getToken();
+    const token = getToken();
+    if (!token) {
+      setError("Authentication token not found.");
+      return;
+    }
 
-  if (!token) {
-    setError(
-      "Authentication token not found."
-    );
-    return;
-  }
+    try {
+      setFlaggingScanId(scanId);
+      setError("");
 
-  try {
-    setFlaggingScanId(scanId);
-    setError("");
-
-    const response = await fetch(
-      `${API_URL}/api/moderator/scans/${scanId}/flag`,
-      {
+      const response = await fetch(`${API_URL}/api/moderator/scans/${scanId}/flag`, {
         method: "POST",
-
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
           Accept: "application/json",
         },
+        body: JSON.stringify({ reason: cleanReason }),
+      });
 
-        body: JSON.stringify({
-          reason: cleanReason,
-        }),
-      }
-    );
+      const data = await readResponse(response);
+      if (!response.ok) throw new Error(data.message || "Failed to flag scan.");
 
-    const data =
-      await readResponse(response);
-
-    if (!response.ok) {
-      throw new Error(
-        data.message ||
-          "Failed to flag scan."
+      setScans((previousScans) =>
+        previousScans.map((scan) =>
+          scan._id === scanId
+           ? {...scan, isFlagged: true, flagReason: cleanReason, flaggedAt: new Date().toISOString() }
+            : scan
+        )
       );
+      alert("🚩 Scan flagged successfully.");
+
+    } catch (err) {
+      console.error("FLAG SCAN ERROR:", err);
+      setError(err.message || "Unable to flag scan.");
+    } finally {
+      setFlaggingScanId(null);
     }
+  };
 
-    // Update scan immediately
-    setScans((previousScans) =>
-      previousScans.map((scan) =>
-        scan._id === scanId
-          ? {
-              ...scan,
-              isFlagged: true,
-              flagReason: cleanReason,
-              flaggedAt:
-                new Date().toISOString(),
-            }
-          : scan
-      )
-    );
-
-    alert(
-      "🚩 Scan flagged successfully."
-    );
-
-  } catch (err) {
-    console.error(
-      "FLAG SCAN ERROR:",
-      err
-    );
-
-    setError(
-      err.message ||
-        "Unable to flag scan."
-    );
-
-  } finally {
-    setFlaggingScanId(null);
-  }
-};
-  const loadModeratorData =
-    async () => {
-      const token =
-        getToken();
-
-      if (!token) {
-        setError(
-          "Authentication token not found."
-        );
-
-        setLoading(false);
-
-        return;
-      }
-
-      setLoading(true);
-      setError("");
-
-      try {
-        const headers = {
-          Authorization: `Bearer ${token}`,
-          Accept:
-            "application/json",
-        };
-
-        const [
-          scansResponse,
-          statsResponse,
-        ] =
-          await Promise.all([
-            fetch(
-              `${API_URL}/api/moderator/scans`,
-              {
-                headers,
-              }
-            ),
-
-            fetch(
-              `${API_URL}/api/moderator/stats`,
-              {
-                headers,
-              }
-            ),
-          ]);
-
-        const scansData =
-          await readResponse(
-            scansResponse
-          );
-
-        const statsData =
-          await readResponse(
-            statsResponse
-          );
-
-        /*
-          IMPORTANT:
-          Your backend returns:
-          {
-            success: true,
-            count: ...,
-            scans: [...]
-          }
-
-          So we correctly read scansData.scans.
-        */
-
-        if (
-          !scansResponse.ok
-        ) {
-          throw new Error(
-            scansData.message ||
-              scansData.details ||
-              "Moderator scans API is unavailable."
-          );
-        }
-
-        if (
-          !statsResponse.ok
-        ) {
-          throw new Error(
-            statsData.message ||
-              statsData.details ||
-              "Moderator statistics API is unavailable."
-          );
-        }
-
-        const list =
-          Array.isArray(
-            scansData
-          )
-            ? scansData
-            : Array.isArray(
-                scansData.scans
-              )
-            ? scansData.scans
-            : [];
-
-        const orderedScans =
-          [...list].sort(
-            (a, b) =>
-              new Date(
-                b.createdAt ||
-                  0
-              ) -
-              new Date(
-                a.createdAt ||
-                  0
-              )
-          );
-
-        setScans(
-          orderedScans
-        );
-        const flagsArray = orderedScans.filter(
-  (scan) =>
-    scan.flagged === true ||
-    scan.isFlagged === true ||
-    scan.verdict === "THREAT"
-);
-
-setFlaggedScans(flagsArray);
-
-        setStats({
-          scans:
-            statsData?.scans
-              ?.total ??
-            orderedScans.length,
-
-          safe:
-            statsData?.results
-              ?.safe ??
-            orderedScans.filter(
-              (scan) =>
-                getVerdict(
-                  scan
-                ) ===
-                "SAFE"
-            ).length,
-
-          threats:
-            statsData?.results
-              ?.threats ??
-            orderedScans.filter(
-              (scan) =>
-                getVerdict(
-                  scan
-                ) ===
-                "THREAT"
-            ).length,
-
-          uncertain:
-            statsData?.results
-              ?.uncertain ??
-            orderedScans.filter(
-              (scan) =>
-                getVerdict(
-                  scan
-                ) ===
-                "UNCERTAIN"
-            ).length,
-        });
-
-        setError("");
-      } catch (err) {
-        console.error(
-          "MODERATOR DASHBOARD ERROR:",
-          err
-        );
-
-        setError(
-          err.message ||
-            "Unable to load moderator data."
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-  useEffect(() => {
-    loadModeratorData();
-  }, [realtimeTick]);
-
-  const filtered =
-    useMemo(() => {
-      const q =
-        query
-          .trim()
-          .toLowerCase();
-
-      return scans.filter(
-        (scan) => {
-          const searchable =
-            `${scan.url || ""} ${
-              scan.summary ||
-              ""
-            } ${getVerdict(
-              scan
-            )} ${getScanType(
-              scan
-            )} ${getUserEmail(
-              scan
-            )}`.toLowerCase();
-
-          return (
-            !q ||
-            searchable.includes(
-              q
-            )
-          );
-        }
-      );
-    }, [
-      scans,
-      query,
-    ]);
-
-  return (
-    <main className="admin-page moderator-page">
-      <section className="admin-hero">
-        <div>
-          <div className="admin-kicker">
-            <span className="admin-live-dot" />
-
-            THREATWATCH //
-            MODERATOR CONTROL
-          </div>
-
-          <h1>
-            MODERATOR{" "}
-            <span>
-              DASHBOARD
-            </span>
-          </h1>
-
-          <p>
-            Monitor verification
-            activity and review
-            security results.
-          </p>
-        </div>
-
-        <div className="admin-status">
-          <span className="status-icon">
-            ◈
-          </span>
-
-          <div>
-            <strong>
-              MODERATOR ACCESS
-            </strong>
-
-            <small>
-              ROLE-BASED CONTROL
-            </small>
-          </div>
-        </div>
-      </section>
-
-      {error && (
-        <div className="admin-error">
-          <span>⚠</span>
-
-          <div>
-            <strong>
-              MODERATOR API ERROR
-            </strong>
-
-            <p>
-              {error}
-            </p>
-
-            <small>
-              Check that the
-              backend is running
-              on port 5001 and
-              that
-              /api/moderator
-              is registered.
-            </small>
-          </div>
-        </div>
-      )}
-
-      <section className="admin-stats">
-        <div className="admin-stat-card scans-stat">
-          <div className="admin-stat-icon">
-            ◉
-          </div>
-
-          <div>
-            <span>
-              TOTAL SCANS
-            </span>
-
-            <strong>
-              {stats.scans}
-            </strong>
-
-            <small>
-              SECURITY RECORDS
-            </small>
-          </div>
-        </div>
-
-        <div className="admin-stat-card safe-stat">
-          <div className="admin-stat-icon">
-            ✓
-          </div>
-
-          <div>
-            <span>
-              SAFE
-            </span>
-
-            <strong>
-              {stats.safe}
-            </strong>
-
-            <small>
-              VERIFIED RESULTS
-            </small>
-          </div>
-        </div>
-
-        <div className="admin-stat-card threat-stat">
-          <div className="admin-stat-icon">
-            !
-          </div>
-
-          <div>
-            <span>
-              THREATS
-            </span>
-
-            <strong>
-              {stats.threats}
-            </strong>
-
-            <small>
-              FLAGGED RESULTS
-            </small>
-          </div>
-        </div>
-
-        <div className="admin-stat-card users-stat">
-          <div className="admin-stat-icon">
-            ◌
-          </div>
-
-          <div>
-            <span>
-              UNCERTAIN
-            </span>
-
-            <strong>
-              {stats.uncertain}
-            </strong>
-
-            <small>
-              NEEDS REVIEW
-            </small>
-          </div>
-        </div>
-      </section>
-
-      <section className="admin-panel">
-        <div className="admin-panel-header">
-          <div>
-            <span className="panel-icon">
-              🛡
-            </span>
-
-            <div>
-              <h2>
-                SECURITY MONITOR
-              </h2>
-
-              <p>
-                Live verification
-                activity
-              </p>
-            </div>
-          </div>
-
-          <span className="panel-count">
-            {filtered.length}{" "}
-            RECORDS
-          </span>
-        </div>
-
-        <div className="history-toolbar">
-          <input
-            value={query}
-            onChange={(e) =>
-              setQuery(
-                e.target.value
-              )
-            }
-            placeholder="Search scans..."
-          />
-
-          <button
-            className="history-refresh"
-            onClick={
-              loadModeratorData
-            }
-            disabled={
-              loading
-            }
-          >
-            {loading
-              ? "LOADING..."
-              : "↻ REFRESH"}
-          </button>
-        </div>
-
-        {loading ? (
-          <div className="admin-empty">
-            ◌ LOADING
-            SECURITY
-            RECORDS...
-          </div>
-        ) : filtered.length ===
-          0 ? (
-          <div className="admin-empty">
-            ◎ NO RECORDS FOUND
-          </div>
-        ) : (
-          <div className="admin-table-wrapper">
-            <table className="admin-table scans-table">
-              <thead>
-                <tr>
-                  <th>
-                    #
-                  </th>
-
-                  <th>
-                    TYPE
-                  </th>
-
-                  <th>
-                    USER
-                  </th>
-
-                  <th>
-                    RISK
-                  </th>
-
-                  <th>
-                    VERDICT
-                  </th>
-
-                  <th>
-                    DATE
-                  </th>
-                  <th>
-  ACTION
-</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {filtered.map(
-                  (
-                    scan,
-                    index
-                  ) => {
-                    const verdict =
-                      getVerdict(
-                        scan
-                      );
-
-                    return (
-                      <tr
-                        key={
-                          scan._id ||
-                          index
-                        }
-                      >
-                        <td>
-                          <span className="row-number">
-                            {index +
-                              1}
-                          </span>
-                        </td>
-
-                        <td>
-                          <span className="scan-type">
-                            {getScanType(
-                              scan
-                            )}
-                          </span>
-                        </td>
-
-                        <td>
-                          <span
-                            className="scan-user"
-                            title={getUserEmail(
-                              scan
-                            )}
-                          >
-                            {getUserEmail(
-                              scan
-                            )}
-                          </span>
-                        </td>
-
-                        <td>
-                          <span
-                            className={`risk-value risk-${verdict.toLowerCase()}`}
-                          >
-                            {scan.riskScore ??
-                              0}
-                            %
-                          </span>
-                        </td>
-
-                        <td>
-                          <span
-                            className={`status-badge status-${verdict.toLowerCase()}`}
-                          >
-                            {
-                              verdict
-                            }
-                          </span>
-                        </td>
-
-                        <td>
-                          <span className="date-cell">
-                            ◷{" "}
-                            {formatDate(
-                              scan.createdAt
-                            )}
-                          </span>
-                        </td>
-                        <td>
-  {scan.isFlagged ? (
-    <span
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "6px",
-        padding: "8px 12px",
-        border: "1px solid #ff3c5a",
-        borderRadius: "7px",
-        color: "#ff3c5a",
-        background:
-          "rgba(255,60,90,.10)",
-        fontSize: "11px",
-        fontWeight: "bold",
-        fontFamily:
-          '"Courier New", monospace',
-      }}
-      title={
-        scan.flagReason ||
-        "Flagged by moderator"
-      }
-    >
-      🚩 FLAGGED
-    </span>
-  ) : (
-    <button
-      type="button"
-      onClick={() =>
-        handleFlagScan(scan._id)
-      }
-      disabled={
-        flaggingScanId === scan._id
-      }
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "8px 12px",
-        minWidth: "105px",
-        background:
-          "rgba(255,60,90,.10)",
-        color: "#ff3c5a",
-        border:
-          "1px solid #ff3c5a",
-        borderRadius: "7px",
-        fontFamily:
-          '"Courier New", monospace',
-        fontSize: "11px",
-        fontWeight: "bold",
-        cursor:
-          flaggingScanId ===
-          scan._id
-            ? "not-allowed"
-            : "pointer",
-      }}
-    >
-      {flaggingScanId === scan._id
-        ? "FLAGGING..."
-        : "🚩 FLAG THREAT"}
-    </button>
-  )}
-</td>
-                      </tr>
-                    );
-                  }
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-    </main>
-  );
-}
-/* =========================================================
-   ADMIN DASHBOARD
-========================================================= */
-
-function AdminPage() {
-  const [users, setUsers] = useState([]);
-  const [scans, setScans] = useState([]);
-  const [flaggedScans, setFlaggedScans] = useState([]);
-const [flagsLoading, setFlagsLoading] = useState(false);
-const [flagsError, setFlagsError] = useState("");
-
-  const [stats, setStats] = useState({
-    users: 0,
-    scans: 0,
-    safe: 0,
-    threats: 0,
-    uncertain: 0,
-  });
-
-
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  const [userSearch, setUserSearch] = useState("");
-  const [scanSearch, setScanSearch] = useState("");
-  const [scanFilter, setScanFilter] = useState("ALL");
-  const [deletingUserId, setDeletingUserId] = useState(null);
-const [deletingScanId, setDeletingScanId] = useState(null);
-
-/* =====================================================
-   DELETE USER
-===================================================== */
-
-const handleDeleteUser = async (userId) => {
-  const confirmed = window.confirm(
-    "⚠️ Are you sure you want to delete this user and all of their scan history?"
-  );
-
-  if (!confirmed) return;
-
-  const token = getToken();
-
-  if (!token) {
-    setError("Authentication token not found.");
-    return;
-  }
-
-  try {
-    setDeletingUserId(userId);
-    setError("");
-
-    const response = await fetch(
-      `${API_URL}/api/admin/users/${userId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      }
-    );
-
-    const data = await readResponse(response);
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || "Failed to delete user."
-      );
-    }
-
-    // Remove user immediately from UI
-    setUsers((previousUsers) =>
-      previousUsers.filter(
-        (user) => user._id !== userId
-      )
-    );
-
-    // Update user count
-    setStats((previousStats) => ({
-      ...previousStats,
-      users: Math.max(
-        0,
-        previousStats.users - 1
-      ),
-    }));
-
-    console.log("✅ User deleted:", userId);
-
-  } catch (err) {
-    console.error(
-      "DELETE USER ERROR:",
-      err
-    );
-
-    setError(
-      err.message ||
-        "Unable to delete user."
-    );
-
-  } finally {
-    setDeletingUserId(null);
-  }
-};
-
-
-/* =====================================================
-   DELETE SCAN
-===================================================== */
-
-const handleDeleteScan = async (scanId) => {
-  const confirmed = window.confirm(
-    "⚠️ Are you sure you want to delete this scan?"
-  );
-
-  if (!confirmed) return;
-
-  const token = getToken();
-
-  if (!token) {
-    setError("Authentication token not found.");
-    return;
-  }
-
-  try {
-    setDeletingScanId(scanId);
-    setError("");
-
-    const response = await fetch(
-      `${API_URL}/api/admin/scans/${scanId}`,
-      {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      }
-    );
-
-    const data = await readResponse(response);
-
-    if (!response.ok) {
-      throw new Error(
-        data.message || "Failed to delete scan."
-      );
-    }
-
-    // Remove scan immediately from UI
-    setScans((previousScans) =>
-      previousScans.filter(
-        (scan) => scan._id !== scanId
-      )
-    );
-
-    // Update scan statistics
-    setStats((previousStats) => ({
-      ...previousStats,
-      scans: Math.max(
-        0,
-        previousStats.scans - 1
-      ),
-    }));
-
-    console.log("✅ Scan deleted:", scanId);
-
-  } catch (err) {
-    console.error(
-      "DELETE SCAN ERROR:",
-      err
-    );
-
-    setError(
-      err.message ||
-        "Unable to delete scan."
-    );
-
-  } finally {
-    setDeletingScanId(null);
-  }
-};
-
-  /* =====================================================
-     LOAD ADMIN DATA
-  ===================================================== */
-
-  const loadAdminData = async () => {
+  const loadModeratorData = async () => {
     const token = getToken();
-
     if (!token) {
       setError("Authentication token not found.");
       setLoading(false);
@@ -3802,208 +2977,395 @@ const handleDeleteScan = async (scanId) => {
     setError("");
 
     try {
-      const headers = {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      };
+      const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
 
-      const [
-        usersResponse,
-        scansResponse,
-        statsResponse,
-        flagsResponse,
-      ] = await Promise.all([
-        fetch(`${API_URL}/api/admin/users`, {
-          headers,
-        }),
-
-        fetch(`${API_URL}/api/admin/scans`, {
-          headers,
-        }),
-
-        fetch(`${API_URL}/api/admin/stats`, {
-          headers,
-        }),
-
-        fetch(`${API_URL}/api/moderator/flags`, {
-    headers,
-  }),
+      const [scansResponse, statsResponse] = await Promise.all([
+        fetch(`${API_URL}/api/moderator/scans`, { headers }),
+        fetch(`${API_URL}/api/moderator/stats`, { headers }),
       ]);
 
-      const usersData = await readResponse(
-        usersResponse
-      );
+      const scansData = await readResponse(scansResponse);
+      const statsData = await readResponse(statsResponse);
 
-      const scansData = await readResponse(
-        scansResponse
-      );
+      if (!scansResponse.ok) throw new Error(scansData.message || "Moderator scans API is unavailable.");
+      if (!statsResponse.ok) throw new Error(statsData.message || "Moderator statistics API is unavailable.");
 
-      const statsData = await readResponse(
-        statsResponse
-      );
-const flagsData =
-  await readResponse(
-    flagsResponse
-  );
+      const list = Array.isArray(scansData)? scansData : Array.isArray(scansData.scans)? scansData.scans : [];
+      const orderedScans = [...list].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 
-
-      if (!usersResponse.ok) {
-        throw new Error(
-          usersData.message ||
-            "Could not load registered users."
-        );
-      }
-
-      if (!scansResponse.ok) {
-        throw new Error(
-          scansData.message ||
-            "Could not load security scans."
-        );
-      }
-
-      if (!statsResponse.ok) {
-        throw new Error(
-          statsData.message ||
-            "Could not load admin statistics."
-        );
-      }
-      if (!flagsResponse.ok) {
-  throw new Error(
-    flagsData.message ||
-      "Could not load flags threats."
-  );
-}
-
-      const usersArray = Array.isArray(usersData)
-        ? usersData
-        : usersData.users || [];
-
-      const scansArray = Array.isArray(scansData)
-        ? scansData
-        : scansData.scans || [];
-
-      const orderedUsers = [...usersArray].sort(
-        (a, b) =>
-          new Date(b.createdAt || 0) -
-          new Date(a.createdAt || 0)
-      );
-
-      const orderedScans = [...scansArray].sort(
-        (a, b) =>
-          new Date(b.createdAt || 0) -
-          new Date(a.createdAt || 0)
-      );
-
-      /* -------------------------------------------------
-         Calculate fallback statistics from scans
-      ------------------------------------------------- */
-
-      const safeCount = orderedScans.filter(
-        (scan) => getVerdict(scan) === "SAFE"
-      ).length;
-
-      const threatCount = orderedScans.filter(
-        (scan) => getVerdict(scan) === "THREAT"
-      ).length;
-
-      const uncertainCount = orderedScans.filter(
-        (scan) => getVerdict(scan) === "UNCERTAIN"
-      ).length;
-
-      setUsers(orderedUsers);
       setScans(orderedScans);
 
-      const flagsArray =
-  Array.isArray(flagsData)
-    ? flagsData
-    : flagsData.flags || [];
-
-setFlaggedScans(flagsArray);
+      const flagsArray = orderedScans.filter(scan => scan.flagged === true || scan.isFlagged === true || scan.verdict === "THREAT");
+      setFlaggedScans(flagsArray);
 
       setStats({
-        users:
-          statsData?.users?.total ??
-          orderedUsers.length,
-
-        scans:
-          statsData?.scans?.total ??
-          orderedScans.length,
-
-        safe:
-          statsData?.results?.safe ??
-          safeCount,
-
-        threats:
-          statsData?.results?.threats ??
-          threatCount,
-
-        uncertain:
-          statsData?.results?.uncertain ??
-          uncertainCount,
+        scans: statsData?.scans?.total?? orderedScans.length,
+        safe: statsData?.results?.safe?? orderedScans.filter(scan => getVerdict(scan) === "SAFE").length,
+        threats: statsData?.results?.threats?? orderedScans.filter(scan => getVerdict(scan) === "THREAT").length,
+        uncertain: statsData?.results?.uncertain?? orderedScans.filter(scan => getVerdict(scan) === "UNCERTAIN").length,
       });
-    } catch (err) {
-      console.error(
-        "ADMIN DASHBOARD ERROR:",
-        err
-      );
 
-      setError(
-        err.message ||
-          "Unable to load admin data."
-      );
+      setError("");
+    } catch (err) {
+      console.error("MODERATOR DASHBOARD ERROR:", err);
+      setError(err.message || "Unable to load moderator data.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAdminData();
-  }, []);
+    loadModeratorData();
+  }, [realtimeTick]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return scans.filter((scan) => {
+      const searchable = `${scan.url || ""} ${scan.summary || ""} ${getVerdict(scan)} ${getScanType(scan)} ${getUserEmail(scan)}`.toLowerCase();
+      return!q || searchable.includes(q);
+    });
+  }, [scans, query]);
+
+  // NAYA: Jab tak permissions load na ho button mat dikhao
+  if (permLoading) {
+    return <div className="admin-page moderator-page"><div className="admin-empty">◌ LOADING PERMISSIONS...</div></div>
+  }
+
+  return (
+    <main className="admin-page moderator-page">
+      <section className="admin-hero">
+        <div>
+          <div className="admin-kicker"><span className="admin-live-dot" />THREATWATCH // MODERATOR CONTROL</div>
+          <h1>MODERATOR <span>DASHBOARD</span></h1>
+          <p>Monitor verification activity and review security results.</p>
+        </div>
+        <div className="admin-status">
+          <span className="status-icon">◈</span>
+          <div><strong>MODERATOR ACCESS</strong><small>ROLE-BASED CONTROL</small></div>
+        </div>
+      </section>
+
+      {error && (
+        <div className="admin-error">
+          <span>⚠</span>
+          <div><strong>MODERATOR API ERROR</strong><p>{error}</p></div>
+        </div>
+      )}
+
+      <section className="admin-stats">
+        <div className="admin-stat-card scans-stat"><div className="admin-stat-icon">◉</div><div><span>TOTAL SCANS</span><strong>{stats.scans}</strong><small>SECURITY RECORDS</small></div></div>
+        <div className="admin-stat-card safe-stat"><div className="admin-stat-icon">✓</div><div><span>SAFE</span><strong>{stats.safe}</strong><small>VERIFIED RESULTS</small></div></div>
+        <div className="admin-stat-card threat-stat"><div className="admin-stat-icon">!</div><div><span>THREATS</span><strong>{stats.threats}</strong><small>FLAGGED RESULTS</small></div></div>
+        <div className="admin-stat-card users-stat"><div className="admin-stat-icon">◌</div><div><span>UNCERTAIN</span><strong>{stats.uncertain}</strong><small>NEEDS REVIEW</small></div></div>
+      </section>
+
+      <section className="admin-panel">
+        <div className="admin-panel-header">
+          <div><span className="panel-icon">🛡</span><div><h2>SECURITY MONITOR</h2><p>Live verification activity</p></div></div>
+          <span className="panel-count">{filtered.length} RECORDS</span>
+        </div>
+
+        <div className="history-toolbar">
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search scans..." />
+          <button className="history-refresh" onClick={loadModeratorData} disabled={loading}>{loading? "LOADING..." : "↻ REFRESH"}</button>
+        </div>
+
+        {loading? (
+          <div className="admin-empty">◌ LOADING SECURITY RECORDS...</div>
+        ) : filtered.length === 0? (
+          <div className="admin-empty">◎ NO RECORDS FOUND</div>
+        ) : (
+          <div className="admin-table-wrapper">
+            <table className="admin-table scans-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>TYPE</th><th>USER</th><th>RISK</th><th>VERDICT</th><th>DATE</th><th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((scan, index) => {
+                  const verdict = getVerdict(scan);
+                  return (
+                    <tr key={scan._id || index}>
+                      <td><span className="row-number">{index + 1}</span></td>
+                      <td><span className="scan-type">{getScanType(scan)}</span></td>
+                      <td><span className="scan-user" title={getUserEmail(scan)}>{getUserEmail(scan)}</span></td>
+                      <td><span className={`risk-value risk-${verdict.toLowerCase()}`}>{scan.riskScore?? 0}%</span></td>
+                      <td><span className={`status-badge status-${verdict.toLowerCase()}`}>{verdict}</span></td>
+                      <td><span className="date-cell">◷ {formatDate(scan.createdAt)}</span></td>
+                      <td>
+                        {scan.isFlagged? (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "8px 12px", border: "1px solid #ff3c5a", borderRadius: "7px", color: "#ff3c5a", background: "rgba(255,60,90,.10)", fontSize: "11px", fontWeight: "bold", fontFamily: '"Courier New", monospace' }} title={scan.flagReason || "Flagged by moderator"}>
+                            🚩 FLAGGED
+                          </span>
+                        ) : (
+                          // YAHAN CHANGE: permissions.canFlag check lagaya
+                          permissions.canFlag && (
+                            <button
+                              type="button"
+                              onClick={() => handleFlagScan(scan._id)}
+                              disabled={flaggingScanId === scan._id}
+                              style={{
+                                display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "8px 12px", minWidth: "105px",
+                                background: "rgba(255,60,90,.10)", color: "#ff3c5a", border: "1px solid #ff3c5a", borderRadius: "7px",
+                                fontFamily: '"Courier New", monospace', fontSize: "11px", fontWeight: "bold",
+                                cursor: flaggingScanId === scan._id? "not-allowed" : "pointer",
+                              }}
+                            >
+                              {flaggingScanId === scan._id? "FLAGGING..." : "🚩 FLAG THREAT"}
+                            </button>
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </main>
+  );
+}
+
+/* =========================================================
+   PERMISSIONS PANEL
+========================================================= */
+function PermissionsPanel() {
+  const [roles, setRoles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const fetchPermissions = async () => {
+    try {
+      const token = getToken();
+      const res = await axios.get(`${API_URL}/api/admin/permissions`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if(res.data.success) setRoles(res.data.permissions);
+    } catch(err) {
+      console.error("Failed to fetch permissions", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPermissions(); }, []);
+
+  const handleToggle = (role, permission) => {
+    setRoles(prev => prev.map(r =>
+      r.role === role
+   ? {...r, permissions: {...r.permissions, [permission]:!r.permissions[permission]}}
+      : r
+    ));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const token = getToken();
+      await axios.put(`${API_URL}/api/admin/permissions`, { permissions: roles }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      alert("✅ Permissions updated successfully");
+    } catch(err) {
+      alert("❌ Failed to update permissions");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if(loading) return <div className="admin-loading">◌ LOADING PERMISSIONS...</div>
+
+  return (
+    <section className="admin-panel">
+      <div className="admin-panel-header">
+        <div>
+          <h2>ROLE PERMISSIONS</h2>
+          <p>Control what each role can do</p>
+        </div>
+        <button className="admin-refresh" onClick={handleSave} disabled={saving}>
+          {saving? "💾 SAVING..." : "💾 SAVE CHANGES"}
+        </button>
+      </div>
+
+      <div className="admin-table-wrapper">
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>ROLE</th>
+              <th>SCAN FLAG KARNA</th>
+              <th>SCAN DELETE KARNA</th>
+            </tr>
+          </thead>
+          <tbody>
+            {roles.map(role => (
+              <tr key={role.role}>
+                <td><strong>{role.role}</strong></td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={role.permissions.canFlag}
+                    onChange={() => handleToggle(role.role, 'canFlag')}
+                    disabled={role.role === 'Admin'} // Admin ko lock
+                  />
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={role.permissions.canDelete}
+                    onChange={() => handleToggle(role.role, 'canDelete')}
+                    disabled={role.role === 'Admin'}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+/* =========================================================
+   ADMIN DASHBOARD
+========================================================= */
+
+function AdminPage() {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [users, setUsers] = useState([]);
+  const [scans, setScans] = useState([]);
+  const [flaggedScans, setFlaggedScans] = useState([]);
+  const [flagsLoading, setFlagsLoading] = useState(false);
+  const [flagsError, setFlagsError] = useState("");
+
+  const [stats, setStats] = useState({
+    users: 0,
+    scans: 0,
+    safe: 0,
+    threats: 0,
+    uncertain: 0,
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const [userSearch, setUserSearch] = useState("");
+  const [scanSearch, setScanSearch] = useState("");
+  const [scanFilter, setScanFilter] = useState("ALL");
+  const [deletingUserId, setDeletingUserId] = useState(null);
+  const [deletingScanId, setDeletingScanId] = useState(null);
+
+  /* =====================================================
+     DELETE USER
+  ===================================================== */
+  const handleDeleteUser = async (userId) => {
+    const confirmed = window.confirm("⚠️ Are you sure you want to delete this user and all of their scan history?");
+    if (!confirmed) return;
+    const token = getToken();
+    if (!token) { setError("Authentication token not found."); return; }
+    try {
+      setDeletingUserId(userId);
+      setError("");
+      const response = await fetch(`${API_URL}/api/admin/users/${userId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+      const data = await readResponse(response);
+      if (!response.ok) { throw new Error(data.message || "Failed to delete user."); }
+      setUsers((previousUsers) => previousUsers.filter((user) => user._id!== userId));
+      setStats((previousStats) => ({...previousStats, users: Math.max(0, previousStats.users - 1) }));
+      console.log("✅ User deleted:", userId);
+    } catch (err) {
+      console.error("DELETE USER ERROR:", err);
+      setError(err.message || "Unable to delete user.");
+    } finally { setDeletingUserId(null); }
+  };
+
+  /* =====================================================
+     DELETE SCAN
+  ===================================================== */
+  const handleDeleteScan = async (scanId) => {
+    const confirmed = window.confirm("⚠️ Are you sure you want to delete this scan?");
+    if (!confirmed) return;
+    const token = getToken();
+    if (!token) { setError("Authentication token not found."); return; }
+    try {
+      setDeletingScanId(scanId);
+      setError("");
+      const response = await fetch(`${API_URL}/api/admin/scans/${scanId}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" } });
+      const data = await readResponse(response);
+      if (!response.ok) { throw new Error(data.message || "Failed to delete scan."); }
+      setScans((previousScans) => previousScans.filter((scan) => scan._id!== scanId));
+      setStats((previousStats) => ({...previousStats, scans: Math.max(0, previousStats.scans - 1) }));
+      console.log("✅ Scan deleted:", scanId);
+    } catch (err) {
+      console.error("DELETE SCAN ERROR:", err);
+      setError(err.message || "Unable to delete scan.");
+    } finally { setDeletingScanId(null); }
+  };
+
+  /* =====================================================
+     LOAD ADMIN DATA
+  ===================================================== */
+  const loadAdminData = async () => {
+    const token = getToken();
+    if (!token) { setError("Authentication token not found."); setLoading(false); return; }
+    setLoading(true);
+    setError("");
+    try {
+      const headers = { Authorization: `Bearer ${token}`, Accept: "application/json" };
+      const [usersResponse, scansResponse, statsResponse, flagsResponse] = await Promise.all([
+        fetch(`${API_URL}/api/admin/users`, { headers }),
+        fetch(`${API_URL}/api/admin/scans`, { headers }),
+        fetch(`${API_URL}/api/admin/stats`, { headers }),
+        fetch(`${API_URL}/api/moderator/flags`, { headers }),
+      ]);
+      const usersData = await readResponse(usersResponse);
+      const scansData = await readResponse(scansResponse);
+      const statsData = await readResponse(statsResponse);
+      const flagsData = await readResponse(flagsResponse);
+      if (!usersResponse.ok) { throw new Error(usersData.message || "Could not load registered users."); }
+      if (!scansResponse.ok) { throw new Error(scansData.message || "Could not load security scans."); }
+      if (!statsResponse.ok) { throw new Error(statsData.message || "Could not load admin statistics."); }
+      if (!flagsResponse.ok) { throw new Error(flagsData.message || "Could not load flags threats."); }
+      const usersArray = Array.isArray(usersData)? usersData : usersData.users || [];
+      const scansArray = Array.isArray(scansData)? scansData : scansData.scans || [];
+      const orderedUsers = [...usersArray].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      const orderedScans = [...scansArray].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+      const safeCount = orderedScans.filter((scan) => getVerdict(scan) === "SAFE").length;
+      const threatCount = orderedScans.filter((scan) => getVerdict(scan) === "THREAT").length;
+      const uncertainCount = orderedScans.filter((scan) => getVerdict(scan) === "UNCERTAIN").length;
+      setUsers(orderedUsers);
+      setScans(orderedScans);
+      const flagsArray = Array.isArray(flagsData)? flagsData : flagsData.flags || [];
+      setFlaggedScans(flagsArray);
+      setStats({ users: statsData?.users?.total?? orderedUsers.length, scans: statsData?.scans?.total?? orderedScans.length, safe: statsData?.results?.safe?? safeCount, threats: statsData?.results?.threats?? threatCount, uncertain: statsData?.results?.uncertain?? uncertainCount });
+    } catch (err) {
+      console.error("ADMIN DASHBOARD ERROR:", err);
+      setError(err.message || "Unable to load admin data.");
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => {
+    if(activeTab!== 'permissions'){
+      loadAdminData();
+    }
+  }, [activeTab]);
 
   /* =====================================================
      PERCENTAGES
   ===================================================== */
-
-  const safePercentage =
-    stats.scans > 0
-      ? Math.round(
-          (stats.safe / stats.scans) * 100
-        )
-      : 0;
-
-  const threatPercentage =
-    stats.scans > 0
-      ? Math.round(
-          (stats.threats / stats.scans) * 100
-        )
-      : 0;
-
-  const uncertainPercentage =
-    stats.scans > 0
-      ? Math.round(
-          (stats.uncertain / stats.scans) * 100
-        )
-      : 0;
+  const safePercentage = stats.scans > 0? Math.round((stats.safe / stats.scans) * 100) : 0;
+  const threatPercentage = stats.scans > 0? Math.round((stats.threats / stats.scans) * 100) : 0;
+  const uncertainPercentage = stats.scans > 0? Math.round((stats.uncertain / stats.scans) * 100) : 0;
 
   /* =====================================================
      FILTER USERS
   ===================================================== */
-
   const filteredUsers = useMemo(() => {
-    const query = userSearch
-      .trim()
-      .toLowerCase();
-
-    if (!query) {
-      return users;
-    }
-
+    const query = userSearch.trim().toLowerCase();
+    if (!query) { return users; }
     return users.filter((user) => {
-      const searchable =
-        `${user.name || ""} ${
-          user.email || ""
-        } ${user.role || ""}`.toLowerCase();
-
+      const searchable = `${user.name || ""} ${user.email || ""} ${user.role || ""}`.toLowerCase();
       return searchable.includes(query);
     });
   }, [users, userSearch]);
@@ -4011,1483 +3373,113 @@ setFlaggedScans(flagsArray);
   /* =====================================================
      FILTER SCANS
   ===================================================== */
-
   const filteredScans = useMemo(() => {
-    const query = scanSearch
-      .trim()
-      .toLowerCase();
-
+    const query = scanSearch.trim().toLowerCase();
     return scans.filter((scan) => {
       const verdict = getVerdict(scan);
       const type = getScanType(scan);
-
-      const searchable =
-        `${scan.url || ""} ${
-          scan.summary || ""
-        } ${getUserEmail(scan)} ${
-          verdict
-        } ${type}`.toLowerCase();
-
-      const matchesSearch =
-        !query ||
-        searchable.includes(query);
-
-      const matchesFilter =
-        scanFilter === "ALL" ||
-        verdict === scanFilter ||
-        type === scanFilter;
-
-      return (
-        matchesSearch &&
-        matchesFilter
-      );
+      const searchable = `${scan.url || ""} ${scan.summary || ""} ${getUserEmail(scan)} ${verdict} ${type}`.toLowerCase();
+      const matchesSearch =!query || searchable.includes(query);
+      const matchesFilter = scanFilter === "ALL" || verdict === scanFilter || type === scanFilter;
+      return matchesSearch && matchesFilter;
     });
-  }, [
-    scans,
-    scanSearch,
-    scanFilter,
-  ]);
+  }, [scans, scanSearch, scanFilter]);
 
-  /* =====================================================
-     HIGH RISK SCANS
-  ===================================================== */
-
-  const highRiskScans = useMemo(() => {
-    return [...scans]
-      .filter(
-        (scan) =>
-          Number(scan.riskScore || 0) >= 70
-      )
-      .slice(0, 5);
-  }, [scans]);
-
-  /* =====================================================
-     RECENT SCANS
-  ===================================================== */
-
+  const highRiskScans = useMemo(() => { return [...scans].filter((scan) => Number(scan.riskScore || 0) >= 70).slice(0, 5); }, [scans]);
   const recentScans = scans.slice(0, 5);
 
-  /* =====================================================
-     RENDER
-  ===================================================== */
-
   return (
-    <main
-      className="admin-page"
-      style={{
-        position: "relative",
-        zIndex: 2,
-        width: "100%",
-        maxWidth: "1250px",
-        margin: "0 auto",
-        padding: "35px 20px 60px",
-        boxSizing: "border-box",
-      }}
-    >
-
-      {/* =================================================
-          HERO
-      ================================================= */}
-
+    <main className="admin-page" style={{ position: "relative", zIndex: 2, width: "100%", maxWidth: "1250px", margin: "0 auto", padding: "35px 20px 60px", boxSizing: "border-box" }}>
       <section className="admin-hero">
         <div>
-          <p className="admin-kicker">
-            THREATWATCH //
-            ADMINISTRATOR CONTROL
-          </p>
-
-          <h1>
-            ADMIN{" "}
-            <span>DASHBOARD</span>
-          </h1>
-
-          <p>
-            Monitor users, security
-            scans, threats and
-            verification activity
-            across the ThreatWatch AI
-            platform.
-          </p>
+          <p className="admin-kicker">THREATWATCH // ADMINISTRATOR CONTROL</p>
+          <h1>ADMIN <span>DASHBOARD</span></h1>
+          <p>Monitor users, security scans, threats and verification activity across the ThreatWatch AI platform.</p>
         </div>
-
-        <div className="admin-status">
-          <span className="green-dot" />
-
-          ADMIN ACCESS
-        </div>
+        <div className="admin-status"><span className="green-dot" /> ADMIN ACCESS</div>
       </section>
 
-      {/* =================================================
-          ERROR
-      ================================================= */}
+      {/* TABS */}
+      <div style={{ display: "flex", gap: "10px", marginBottom: "25px", borderBottom: "1px solid rgba(255,255,255,.1)", paddingBottom: "15px" }}>
+        <button onClick={() => setActiveTab('overview')} style={{ padding: "10px 20px", background: activeTab === 'overview'? "rgba(0,255,150,.1)" : "transparent", border: "1px solid #00ff9d", color: "#00ff9d", cursor: "pointer", fontWeight: "bold", borderRadius: "6px" }}>OVERVIEW</button>
+        <button onClick={() => setActiveTab('permissions')} style={{ padding: "10px 20px", background: activeTab === 'permissions'? "rgba(0,255,150,.1)" : "transparent", border: "1px solid #00ff9d", color: "#00ff9d", cursor: "pointer", fontWeight: "bold", borderRadius: "6px" }}>PERMISSIONS</button>
+      </div>
 
-      {error && (
-        <div className="admin-error">
-          <strong>
-            ADMIN API ERROR
-          </strong>
+      {error && <div className="admin-error"><strong>ADMIN API ERROR</strong><span>{error}</span></div>}
 
-          <span>
-            {error}
-          </span>
-        </div>
-      )}
-
-      {loading ? (
-        <div className="admin-loading">
-          ◌ LOADING ADMIN
-          CONTROL PANEL...
-        </div>
+      {loading && activeTab!== 'permissions'? (
+        <div className="admin-loading">◌ LOADING ADMIN CONTROL PANEL...</div>
       ) : (
         <>
-          {/* =================================================
-              MAIN STATISTICS
-          ================================================= */}
+          {/* TAB: OVERVIEW */}
+          {activeTab === 'overview' && (
+            <>
+              <section className="admin-stats">
+                <div className="admin-stat-card scans-stat"><div className="admin-stat-icon">◉</div><div><span>TOTAL SCANS</span><strong>{stats.scans}</strong><small>ALL SECURITY ANALYSIS</small></div></div>
+                <div className="admin-stat-card safe-stat"><div className="admin-stat-icon">✓</div><div><span>SAFE SCANS</span><strong>{stats.safe}</strong><small>{safePercentage}% OF SCANS</small></div></div>
+                <div className="admin-stat-card threat-stat"><div className="admin-stat-icon">!</div><div><span>THREATS</span><strong>{stats.threats}</strong><small>{threatPercentage}% OF SCANS</small></div></div>
+                <div className="admin-stat-card users-stat"><div className="admin-stat-icon">👥</div><div><span>TOTAL USERS</span><strong>{stats.users}</strong><small>REGISTERED ACCOUNTS</small></div></div>
+              </section>
 
-          <section className="admin-stats">
+              <section className="admin-stats" style={{ marginTop: "18px" }}>
+                <div className="admin-stat-card"><div className="admin-stat-icon">?</div><div><span>UNCERTAIN</span><strong>{stats.uncertain}</strong><small>{uncertainPercentage}% NEED REVIEW</small></div></div>
+                <div className="admin-stat-card"><div className="admin-stat-icon">↗</div><div><span>URL SCANS</span><strong>{scans.filter((scan) => getScanType(scan) === "URL").length}</strong><small>WEBSITE ANALYSIS</small></div></div>
+                <div className="admin-stat-card"><div className="admin-stat-icon">Aa</div><div><span>TEXT SCANS</span><strong>{scans.filter((scan) => getScanType(scan) === "TEXT").length}</strong><small>CLAIM ANALYSIS</small></div></div>
+                <div className="admin-stat-card"><div className="admin-stat-icon">◫</div><div><span>IMAGE SCANS</span><strong>{scans.filter((scan) => getScanType(scan) === "IMAGE").length}</strong><small>IMAGE ANALYSIS</small></div></div>
+              </section>
 
-            <div className="admin-stat-card scans-stat">
-              <div className="admin-stat-icon">
-                ◉
-              </div>
-
-              <div>
-                <span>
-                  TOTAL SCANS
-                </span>
-
-                <strong>
-                  {stats.scans}
-                </strong>
-
-                <small>
-                  ALL SECURITY ANALYSIS
-                </small>
-              </div>
-            </div>
-
-            <div className="admin-stat-card safe-stat">
-              <div className="admin-stat-icon">
-                ✓
-              </div>
-
-              <div>
-                <span>
-                  SAFE SCANS
-                </span>
-
-                <strong>
-                  {stats.safe}
-                </strong>
-
-                <small>
-                  {safePercentage}% OF SCANS
-                </small>
-              </div>
-            </div>
-
-            <div className="admin-stat-card threat-stat">
-              <div className="admin-stat-icon">
-                !
-              </div>
-
-              <div>
-                <span>
-                  THREATS
-                </span>
-
-                <strong>
-                  {stats.threats}
-                </strong>
-
-                <small>
-                  {threatPercentage}% OF SCANS
-                </small>
-              </div>
-            </div>
-
-            <div className="admin-stat-card users-stat">
-              <div className="admin-stat-icon">
-                👥
-              </div>
-
-              <div>
-                <span>
-                  TOTAL USERS
-                </span>
-
-                <strong>
-                  {stats.users}
-                </strong>
-
-                <small>
-                  REGISTERED ACCOUNTS
-                </small>
-              </div>
-            </div>
-
-          </section>
-
-          {/* =================================================
-              SECONDARY STATISTICS
-          ================================================= */}
-
-          <section
-            className="admin-stats"
-            style={{
-              marginTop: "18px",
-            }}
-          >
-
-            <div className="admin-stat-card">
-              <div className="admin-stat-icon">
-                ?
-              </div>
-
-              <div>
-                <span>
-                  UNCERTAIN
-                </span>
-
-                <strong>
-                  {stats.uncertain}
-                </strong>
-
-                <small>
-                  {uncertainPercentage}%
-                  NEED REVIEW
-                </small>
-              </div>
-            </div>
-
-            <div className="admin-stat-card">
-              <div className="admin-stat-icon">
-                ↗
-              </div>
-
-              <div>
-                <span>
-                  URL SCANS
-                </span>
-
-                <strong>
-                  {
-                    scans.filter(
-                      (scan) =>
-                        getScanType(scan) ===
-                        "URL"
-                    ).length
-                  }
-                </strong>
-
-                <small>
-                  WEBSITE ANALYSIS
-                </small>
-              </div>
-            </div>
-
-            <div className="admin-stat-card">
-              <div className="admin-stat-icon">
-                Aa
-              </div>
-
-              <div>
-                <span>
-                  TEXT SCANS
-                </span>
-
-                <strong>
-                  {
-                    scans.filter(
-                      (scan) =>
-                        getScanType(scan) ===
-                        "TEXT"
-                    ).length
-                  }
-                </strong>
-
-                <small>
-                  CLAIM ANALYSIS
-                </small>
-              </div>
-            </div>
-
-            <div className="admin-stat-card">
-              <div className="admin-stat-icon">
-                ◫
-              </div>
-
-              <div>
-                <span>
-                  IMAGE SCANS
-                </span>
-
-                <strong>
-                  {
-                    scans.filter(
-                      (scan) =>
-                        getScanType(scan) ===
-                        "IMAGE"
-                    ).length
-                  }
-                </strong>
-
-                <small>
-                  IMAGE ANALYSIS
-                </small>
-              </div>
-            </div>
-
-          </section>
-
-          {/* =================================================
-              SECURITY ANALYTICS
-          ================================================= */}
-
-          <section className="admin-panel">
-
-            <div className="admin-panel-header">
-              <div>
-                <h2>
-                  SECURITY ANALYTICS
-                </h2>
-
-                <p>
-                  Overall verification
-                  result distribution
-                </p>
-              </div>
-
-              <span>
-                {stats.scans} TOTAL
-              </span>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fit, minmax(220px, 1fr))",
-                gap: "18px",
-                padding: "20px 0",
-              }}
-            >
-
-              {/* SAFE */}
-
-              <div
-                style={{
-                  padding: "20px",
-                  border:
-                    "1px solid rgba(0,255,150,.25)",
-                  background:
-                    "rgba(0,255,150,.04)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <strong>
-                    SAFE
-                  </strong>
-
-                  <span>
-                    {safePercentage}%
-                  </span>
+              <section className="admin-panel">
+                <div className="admin-panel-header"><div><h2>SECURITY ANALYTICS</h2><p>Overall verification result distribution</p></div><span>{stats.scans} TOTAL</span></div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "18px", padding: "20px 0" }}>
+                  <div style={{ padding: "20px", border: "1px solid rgba(0,255,150,.25)", background: "rgba(0,255,150,.04)" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}><strong>SAFE</strong><span>{safePercentage}%</span></div><div style={{ height: "8px", background: "rgba(255,255,255,.08)", overflow: "hidden" }}><div style={{ width: `${safePercentage}%`, height: "100%", background: "#00ff9d" }} /></div></div>
+                  <div style={{ padding: "20px", border: "1px solid rgba(255,60,90,.25)", background: "rgba(255,60,90,.04)" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}><strong>THREATS</strong><span>{threatPercentage}%</span></div><div style={{ height: "8px", background: "rgba(255,255,255,.08)", overflow: "hidden" }}><div style={{ width: `${threatPercentage}%`, height: "100%", background: "#ff3c5a" }} /></div></div>
+                  <div style={{ padding: "20px", border: "1px solid rgba(255,190,50,.25)", background: "rgba(255,190,50,.04)" }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}><strong>UNCERTAIN</strong><span>{uncertainPercentage}%</span></div><div style={{ height: "8px", background: "rgba(255,255,255,.08)", overflow: "hidden" }}><div style={{ width: `${uncertainPercentage}%`, height: "100%", background: "#ffbe32" }} /></div></div>
                 </div>
+              </section>
 
-                <div
-                  style={{
-                    height: "8px",
-                    background:
-                      "rgba(255,255,255,.08)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width:
-                        `${safePercentage}%`,
-                      height: "100%",
-                      background:
-                        "#00ff9d",
-                    }}
-                  />
-                </div>
-              </div>
+              <section className="admin-panel">
+                <div className="admin-panel-header"><div><h2>🚨 HIGH-RISK THREAT MONITOR</h2><p>Security scans with risk score 70% or higher</p></div><span>{highRiskScans.length} HIGH RISK</span></div>
+                {highRiskScans.length === 0? (<div className="admin-empty">✓ NO HIGH-RISK THREATS DETECTED</div>) : (
+                  <div className="admin-table-wrapper" style={{ overflowX: "auto" }}>
+                    <table className="admin-table"><thead><tr><th>#</th><th>TYPE</th><th>USER</th><th>TARGET</th><th>RISK</th><th>VERDICT</th></tr></thead><tbody>{highRiskScans.map((scan, index) => { const verdict = getVerdict(scan); return (<tr key={scan._id || `high-${index}`}><td>{index + 1}</td><td>{getScanType(scan)}</td><td>{getUserEmail(scan)}</td><td title={scan.url || ""}>{scan.url || "N/A"}</td><td><strong style={{ color: "#ff3c5a" }}>{scan.riskScore?? 0}%</strong></td><td><span className="admin-threat">{verdict}</span></td></tr>); })}</tbody></table>
+                  </div>
+                )}
+              </section>
 
-              {/* THREAT */}
+              <section className="admin-panel">
+                <div className="admin-panel-header"><div><h2>🚩 MODERATOR FLAGGED THREATS</h2><p>Threats manually flagged by moderators</p></div><span>{flaggedScans.length} FLAGGED</span></div>
+                {flaggedScans.length === 0? (<div className="admin-empty">✓ NO MODERATOR FLAGS</div>) : (
+                  <div className="admin-table-wrapper" style={{ overflowX: "auto" }}>
+                    <table className="admin-table"><thead><tr><th>#</th><th>TYPE</th><th>USER</th><th>TARGET</th><th>RISK</th><th>FLAGGED BY</th><th>REASON</th><th>DATE</th></tr></thead><tbody>{flaggedScans.map((scan, index) => (<tr key={scan._id || `flag-${index}`}><td>{index + 1}</td><td><span className="scan-type">{getScanType(scan)}</span></td><td>{getUserEmail(scan)}</td><td title={scan.url || ""} style={{ maxWidth: "220px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{scan.url || "N/A"}</td><td><strong style={{ color: "#ff3c5a" }}>{scan.riskScore?? 0}%</strong></td><td>{scan.flaggedBy?.name || scan.flaggedBy?.email || "Moderator"}</td><td title={scan.flagReason || ""}>{scan.flagReason || "Threat flagged"}</td><td>{formatDate(scan.flaggedAt)}</td></tr>))}</tbody></table>
+                  </div>
+                )}
+              </section>
 
-              <div
-                style={{
-                  padding: "20px",
-                  border:
-                    "1px solid rgba(255,60,90,.25)",
-                  background:
-                    "rgba(255,60,90,.04)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <strong>
-                    THREATS
-                  </strong>
+              <section className="admin-panel">
+                <div className="admin-panel-header"><div><h2>REGISTERED USERS</h2><p>All accounts registered on ThreatWatch AI</p></div><span>{filteredUsers.length} USERS</span></div>
+                <div className="history-toolbar" style={{ marginBottom: "20px" }}><input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search name, email or role..." /></div>
+                {filteredUsers.length === 0? (<div className="admin-empty">NO USERS FOUND</div>) : (
+                  <div className="admin-table-wrapper" style={{ overflowX: "auto" }}>
+                    <table className="admin-table"><thead><tr><th>#</th><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>REGISTERED</th><th>ACTION</th></tr></thead><tbody>{filteredUsers.map((item, index) => { const role = String(item.role || "User").trim().toLowerCase(); return (<tr key={item._id || item.id || `user-${index}`}><td>{index + 1}</td><td>{item.name || "N/A"}</td><td title={item.email || ""}>{item.email || "N/A"}</td><td><select value={item.role || "User"} onChange={(e) => handleRoleChange(item._id || item.id, e.target.value)} disabled={(item._id || item.id) === getSavedUser()?._id} className="role-select"><option value="User">User</option><option value="Moderator">Moderator</option><option value="Admin">Admin</option></select></td><td>{formatDate(item.createdAt)}</td><td>{role === "admin"? (<span style={{ color: "#888", fontSize: "12px", fontWeight: "bold" }}>PROTECTED</span>) : (<button type="button" onClick={() => handleDeleteUser(item._id || item.id)} disabled={deletingUserId === (item._id || item.id)} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "9px 16px", minWidth: "90px", background: "rgba(255, 23, 68, 0.15)", color: "#ff1744", border: "1px solid #ff1744", borderRadius: "7px", fontFamily: '"Courier New", monospace', fontSize: "12px", fontWeight: "bold", cursor: deletingUserId === (item._id || item.id)? "not-allowed" : "pointer" }}>{deletingUserId === (item._id || item.id)? "DELETING..." : "🗑 DELETE"}</button>)}</td></tr>); })}</tbody></table>
+                  </div>
+                )}
+              </section>
 
-                  <span>
-                    {threatPercentage}%
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    height: "8px",
-                    background:
-                      "rgba(255,255,255,.08)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width:
-                        `${threatPercentage}%`,
-                      height: "100%",
-                      background:
-                        "#ff3c5a",
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* UNCERTAIN */}
-
-              <div
-                style={{
-                  padding: "20px",
-                  border:
-                    "1px solid rgba(255,190,50,.25)",
-                  background:
-                    "rgba(255,190,50,.04)",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent:
-                      "space-between",
-                    marginBottom: "12px",
-                  }}
-                >
-                  <strong>
-                    UNCERTAIN
-                  </strong>
-
-                  <span>
-                    {uncertainPercentage}%
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    height: "8px",
-                    background:
-                      "rgba(255,255,255,.08)",
-                    overflow: "hidden",
-                  }}
-                >
-                  <div
-                    style={{
-                      width:
-                        `${uncertainPercentage}%`,
-                      height: "100%",
-                      background:
-                        "#ffbe32",
-                    }}
-                  />
-                </div>
-              </div>
-
-            </div>
-          </section>
-
-          {/* =================================================
-              HIGH RISK THREAT MONITOR
-          ================================================= */}
-
-          <section className="admin-panel">
-
-            <div className="admin-panel-header">
-              <div>
-                <h2>
-                  🚨 HIGH-RISK THREAT MONITOR
-                </h2>
-
-                <p>
-                  Security scans with
-                  risk score 70% or higher
-                </p>
-              </div>
-
-              <span>
-                {highRiskScans.length}
-                {" "}HIGH RISK
-              </span>
-            </div>
-
-            {highRiskScans.length === 0 ? (
-              <div className="admin-empty">
-                ✓ NO HIGH-RISK THREATS
-                DETECTED
-              </div>
-            ) : (
-              <div
-                className="admin-table-wrapper"
-                style={{
-                  overflowX: "auto",
-                }}
-              >
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>TYPE</th>
-                      <th>USER</th>
-                      <th>TARGET</th>
-                      <th>RISK</th>
-                      <th>VERDICT</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {highRiskScans.map(
-                      (scan, index) => {
-                        const verdict =
-                          getVerdict(scan);
-
-                        return (
-                          <tr
-                            key={
-                              scan._id ||
-                              `high-${index}`
-                            }
-                          >
-                            <td>
-                              {index + 1}
-                            </td>
-
-                            <td>
-                              {getScanType(
-                                scan
-                              )}
-                            </td>
-
-                            <td>
-                              {getUserEmail(
-                                scan
-                              )}
-                            </td>
-
-                            <td
-                              title={
-                                scan.url ||
-                                ""
-                              }
-                            >
-                              {scan.url ||
-                                "N/A"}
-                            </td>
-
-                            <td>
-                              <strong
-                                style={{
-                                  color:
-                                    "#ff3c5a",
-                                }}
-                              >
-                                {scan.riskScore ??
-                                  0}
-                                %
-                              </strong>
-                            </td>
-
-                            <td>
-                              <span className="admin-threat">
-                                {verdict}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      }
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-{/* =================================================
-    MODERATOR FLAGGED THREATS
-================================================= */}
-
-<section className="admin-panel">
-
-  <div className="admin-panel-header">
-    <div>
-      <h2>
-        🚩 MODERATOR FLAGGED THREATS
-      </h2>
-
-      <p>
-        Threats manually flagged by moderators
-      </p>
-    </div>
-
-    <span>
-      {flaggedScans.length} FLAGGED
-    </span>
-  </div>
-
-  {flaggedScans.length === 0 ? (
-    <div className="admin-empty">
-      ✓ NO MODERATOR FLAGS
-    </div>
-  ) : (
-    <div
-      className="admin-table-wrapper"
-      style={{
-        overflowX: "auto",
-      }}
-    >
-      <table className="admin-table">
-
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>TYPE</th>
-            <th>USER</th>
-            <th>TARGET</th>
-            <th>RISK</th>
-            <th>FLAGGED BY</th>
-            <th>REASON</th>
-            <th>DATE</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {flaggedScans.map(
-            (scan, index) => (
-              <tr
-                key={
-                  scan._id ||
-                  `flag-${index}`
-                }
-              >
-
-                <td>
-                  {index + 1}
-                </td>
-
-                <td>
-                  <span className="scan-type">
-                    {getScanType(scan)}
-                  </span>
-                </td>
-
-                <td>
-                  {getUserEmail(scan)}
-                </td>
-
-                <td
-                  title={
-                    scan.url || ""
-                  }
-                  style={{
-                    maxWidth: "220px",
-                    overflow: "hidden",
-                    textOverflow:
-                      "ellipsis",
-                    whiteSpace:
-                      "nowrap",
-                  }}
-                >
-                  {scan.url || "N/A"}
-                </td>
-
-                <td>
-                  <strong
-                    style={{
-                      color: "#ff3c5a",
-                    }}
-                  >
-                    {scan.riskScore ?? 0}%
-                  </strong>
-                </td>
-
-                <td>
-                  {scan.flaggedBy?.name ||
-                    scan.flaggedBy?.email ||
-                    "Moderator"}
-                </td>
-
-                <td
-                  title={
-                    scan.flagReason || ""
-                  }
-                >
-                  {scan.flagReason ||
-                    "Threat flagged"}
-                </td>
-
-                <td>
-                  {formatDate(
-                    scan.flaggedAt
-                  )}
-                </td>
-
-              </tr>
-            )
+              <section className="admin-panel">
+                <div className="admin-panel-header"><div><h2>ALL SECURITY SCANS</h2><p>Complete platform-wide security scan records</p></div><span>{filteredScans.length} RECORDS</span></div>
+                <div className="history-toolbar" style={{ marginBottom: "20px" }}><input value={scanSearch} onChange={(e) => setScanSearch(e.target.value)} placeholder="Search URL, user, threat, verdict..." /><select value={scanFilter} onChange={(e) => setScanFilter(e.target.value)}><option value="ALL">ALL RESULTS</option><option value="SAFE">SAFE</option><option value="THREAT">THREAT</option><option value="UNCERTAIN">UNCERTAIN</option><option value="URL">URL</option><option value="TEXT">TEXT</option><option value="IMAGE">IMAGE</option></select></div>
+                {filteredScans.length === 0? (<div className="admin-empty">NO SCAN RECORDS FOUND</div>) : (
+                  <div className="admin-table-wrapper" style={{ overflowX: "auto" }}>
+                    <table className="admin-table"><thead><tr><th>#</th><th>TYPE</th><th>USER</th><th>TARGET</th><th>RISK</th><th>VERDICT</th><th>DATE</th><th>ACTION</th></tr></thead><tbody>{filteredScans.map((scan, index) => { const verdict = getVerdict(scan); return (<tr key={scan._id || `scan-${index}`}><td>{index + 1}</td><td><span className="scan-type">{getScanType(scan)}</span></td><td title={getUserEmail(scan)}>{getUserEmail(scan)}</td><td title={scan.url || ""} style={{ maxWidth: "250px", overflow: "hidden", textOverflow: "ellipsis" }}>{scan.url || "N/A"}</td><td><strong>{scan.riskScore?? 0}%</strong></td><td><span className={verdict === "SAFE"? "admin-safe" : verdict === "THREAT"? "admin-threat" : "admin-uncertain"}>{verdict}</span></td><td>{formatDate(scan.createdAt)}</td><td><button type="button" onClick={() => handleDeleteScan(scan._id)} disabled={deletingScanId === scan._id} style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", padding: "9px 16px", minWidth: "90px", background: "rgba(255, 23, 68, 0.15)", color: "#ff1744", border: "1px solid #ff1744", borderRadius: "7px", fontFamily: '"Courier New", monospace', fontSize: "12px", fontWeight: "bold", cursor: deletingScanId === scan._id? "not-allowed" : "pointer" }}>{deletingScanId === scan._id? "DELETING..." : "🗑 DELETE"}</button></td></tr>); })}</tbody></table>
+                  </div>
+                )}
+              </section>
+              <button className="admin-refresh" onClick={loadAdminData} disabled={loading}>{loading? "↻ LOADING..." : "↻ REFRESH ADMIN DATA"}</button>
+            </>
           )}
-        </tbody>
 
-      </table>
-    </div>
-  )}
-</section>
-
-
-          {/* =================================================
-              RECENT SECURITY ACTIVITY
-          ================================================= */}
-
-          <section className="admin-panel">
-
-            <div className="admin-panel-header">
-              <div>
-                <h2>
-                  RECENT SECURITY ACTIVITY
-                </h2>
-
-                <p>
-                  Latest verification
-                  activity
-                </p>
-              </div>
-
-              <span>
-                LAST {recentScans.length}
-              </span>
-            </div>
-
-            {recentScans.length === 0 ? (
-              <div className="admin-empty">
-                NO RECENT SCANS
-              </div>
-            ) : (
-              <div
-                className="admin-table-wrapper"
-                style={{
-                  overflowX: "auto",
-                }}
-              >
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>TYPE</th>
-                      <th>USER</th>
-                      <th>RISK</th>
-                      <th>VERDICT</th>
-                      <th>DATE</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {recentScans.map(
-                      (scan, index) => {
-                        const verdict =
-                          getVerdict(scan);
-
-                        return (
-                          <tr
-                            key={
-                              scan._id ||
-                              `recent-${index}`
-                            }
-                          >
-                            <td>
-                              {index + 1}
-                            </td>
-
-                            <td>
-                              {getScanType(
-                                scan
-                              )}
-                            </td>
-
-                            <td>
-                              {getUserEmail(
-                                scan
-                              )}
-                            </td>
-
-                            <td>
-                              {scan.riskScore ??
-                                0}
-                              %
-                            </td>
-
-                            <td>
-                              <span
-                                className={
-                                  verdict ===
-                                  "SAFE"
-                                    ? "admin-safe"
-                                    : verdict ===
-                                      "THREAT"
-                                    ? "admin-threat"
-                                    : "admin-uncertain"
-                                }
-                              >
-                                {verdict}
-                              </span>
-                            </td>
-
-                            <td>
-                              {formatDate(
-                                scan.createdAt
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      }
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          {/* =================================================
-              REGISTERED USERS
-          ================================================= */}
-
-          <section className="admin-panel">
-
-            <div className="admin-panel-header">
-              <div>
-                <h2>
-                  REGISTERED USERS
-                </h2>
-
-                <p>
-                  All accounts registered
-                  on ThreatWatch AI
-                </p>
-              </div>
-
-              <span>
-                {filteredUsers.length}
-                {" "}USERS
-              </span>
-            </div>
-
-            <div
-              className="history-toolbar"
-              style={{
-                marginBottom: "20px",
-              }}
-            >
-              <input
-                value={userSearch}
-                onChange={(e) =>
-                  setUserSearch(
-                    e.target.value
-                  )
-                }
-                placeholder="Search name, email or role..."
-              />
-            </div>
-
-            {filteredUsers.length === 0 ? (
-              <div className="admin-empty">
-                NO USERS FOUND
-              </div>
-            ) : (
-              <div
-                className="admin-table-wrapper"
-                style={{
-                  overflowX: "auto",
-                }}
-              >
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>NAME</th>
-                      <th>EMAIL</th>
-                      <th>ROLE</th>
-                      <th>REGISTERED</th>
-                      <th>ACTION</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filteredUsers.map(
-                      (item, index) => {
-                        const role =
-                          String(
-                            item.role ||
-                              "User"
-                          )
-                            .trim()
-                            .toLowerCase();
-
-                        return (
-                          <tr
-                            key={
-                              item._id ||
-                              item.id ||
-                              `user-${index}`
-                            }
-                          >
-                            <td>
-                              {index + 1}
-                            </td>
-
-                            <td>
-                              {item.name ||
-                                "N/A"}
-                            </td>
-
-                            <td
-                              title={
-                                item.email ||
-                                ""
-                              }
-                            >
-                              {item.email ||
-                                "N/A"}
-                            </td>
-
-                           <td>
-  <select
-    value={item.role || "User"}
-    onChange={(e) =>
-      handleRoleChange(
-        item._id || item.id,
-        e.target.value
-      )
-    }
-    disabled={
-      (item._id || item.id) ===
-      getSavedUser()?._id
-    }
-    className="role-select"
-  >
-    <option value="User">
-      User
-    </option>
-
-    <option value="Moderator">
-      Moderator
-    </option>
-
-    <option value="Admin">
-      Admin
-    </option>
-  </select>
-</td>
-                            <td>
-                              {formatDate(
-                                item.createdAt
-                              )}
-                            </td>
-                            <td>
-  {role === "admin" ? (
-    <span
-      style={{
-        color: "#888",
-        fontSize: "12px",
-        fontWeight: "bold",
-      }}
-    >
-      PROTECTED
-    </span>
-  ) : (
-    <button
-      type="button"
-      onClick={() =>
-        handleDeleteUser(
-          item._id || item.id
-        )
-      }
-      disabled={
-        deletingUserId ===
-        (item._id || item.id)
-      }
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "9px 16px",
-        minWidth: "90px",
-        background:
-          "rgba(255, 23, 68, 0.15)",
-        color: "#ff1744",
-        border:
-          "1px solid #ff1744",
-        borderRadius: "7px",
-        fontFamily:
-          '"Courier New", monospace',
-        fontSize: "12px",
-        fontWeight: "bold",
-        cursor:
-          deletingUserId ===
-          (item._id || item.id)
-            ? "not-allowed"
-            : "pointer",
-      }}
-    >
-      {deletingUserId ===
-      (item._id || item.id)
-        ? "DELETING..."
-        : "🗑 DELETE"}
-    </button>
-  )}
-</td>
-                          </tr>
-                        );
-                      }
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          {/* =================================================
-    MODERATOR THREAT FLAGS
-================================================= */}
-
-<section className="admin-panel">
-
-  <div className="admin-panel-header">
-    <div>
-      <h2>
-        🚩 MODERATOR THREAT FLAGS
-      </h2>
-
-      <p>
-        Threats reported by moderators
-        for administrator review
-      </p>
-    </div>
-
-    <span>
-      {flaggedScans.length} FLAGS
-    </span>
-  </div>
-
-  {flaggedScans.length === 0 ? (
-    <div className="admin-empty">
-      ✓ NO MODERATOR FLAGS
-    </div>
-  ) : (
-    <div
-      className="admin-table-wrapper"
-      style={{
-        overflowX: "auto",
-      }}
-    >
-      <table className="admin-table">
-
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>MODERATOR</th>
-            <th>USER</th>
-            <th>TYPE</th>
-            <th>TARGET</th>
-            <th>RISK</th>
-            <th>VERDICT</th>
-            <th>REASON</th>
-            <th>FLAGGED</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          {flaggedScans.map(
-            (scan, index) => {
-
-              const moderator =
-                scan.flaggedBy;
-
-              const user =
-                scan.user;
-
-              return (
-                <tr
-                  key={
-                    scan._id ||
-                    `flag-${index}`
-                  }
-                >
-
-                  <td>
-                    {index + 1}
-                  </td>
-
-                  <td>
-                    <strong>
-                      {moderator?.name ||
-                        "Unknown"}
-                    </strong>
-
-                    <br />
-
-                    <small>
-                      {moderator?.email ||
-                        "N/A"}
-                    </small>
-                  </td>
-
-                  <td>
-                    {user?.email ||
-                      "N/A"}
-                  </td>
-
-                  <td>
-                    <span className="scan-type">
-                      {getScanType(scan)}
-                    </span>
-                  </td>
-
-                  <td
-                    title={
-                      scan.url || ""
-                    }
-                    style={{
-                      maxWidth: "220px",
-                      overflow: "hidden",
-                      textOverflow:
-                        "ellipsis",
-                    }}
-                  >
-                    {scan.url ||
-                      "N/A"}
-                  </td>
-
-                  <td>
-                    <strong
-                      style={{
-                        color:
-                          "#ff3c5a",
-                      }}
-                    >
-                      {scan.riskScore ?? 0}%
-                    </strong>
-                  </td>
-
-                  <td>
-                    <span className="admin-threat">
-                      {getVerdict(scan)}
-                    </span>
-                  </td>
-
-                  <td
-                    title={
-                      scan.flagReason ||
-                      ""
-                    }
-                    style={{
-                      maxWidth: "260px",
-                      overflow: "hidden",
-                      textOverflow:
-                        "ellipsis",
-                    }}
-                  >
-                    {scan.flagReason ||
-                      "No reason provided"}
-                  </td>
-
-                  <td>
-                    {formatDate(
-                      scan.flaggedAt
-                    )}
-                  </td>
-
-                </tr>
-              );
-            }
-          )}
-        </tbody>
-
-      </table>
-    </div>
-  )}
-
-</section>
-
-          {/* =================================================
-              ALL SECURITY SCANS
-          ================================================= */}
-
-          <section className="admin-panel">
-
-            <div className="admin-panel-header">
-              <div>
-                <h2>
-                  ALL SECURITY SCANS
-                </h2>
-
-                <p>
-                  Complete platform-wide
-                  security scan records
-                </p>
-              </div>
-
-              <span>
-                {filteredScans.length}
-                {" "}RECORDS
-              </span>
-            </div>
-
-            <div
-              className="history-toolbar"
-              style={{
-                marginBottom: "20px",
-              }}
-            >
-              <input
-                value={scanSearch}
-                onChange={(e) =>
-                  setScanSearch(
-                    e.target.value
-                  )
-                }
-                placeholder="Search URL, user, threat, verdict..."
-              />
-
-              <select
-                value={scanFilter}
-                onChange={(e) =>
-                  setScanFilter(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="ALL">
-                  ALL RESULTS
-                </option>
-
-                <option value="SAFE">
-                  SAFE
-                </option>
-
-                <option value="THREAT">
-                  THREAT
-                </option>
-
-                <option value="UNCERTAIN">
-                  UNCERTAIN
-                </option>
-
-                <option value="URL">
-                  URL
-                </option>
-
-                <option value="TEXT">
-                  TEXT
-                </option>
-
-                <option value="IMAGE">
-                  IMAGE
-                </option>
-              </select>
-            </div>
-
-            {filteredScans.length === 0 ? (
-              <div className="admin-empty">
-                NO SCAN RECORDS FOUND
-              </div>
-            ) : (
-              <div
-                className="admin-table-wrapper"
-                style={{
-                  overflowX: "auto",
-                }}
-              >
-                <table className="admin-table">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>TYPE</th>
-                      <th>USER</th>
-                      <th>TARGET</th>
-                      <th>RISK</th>
-                      <th>VERDICT</th>
-                      <th>DATE</th>
-                      <th>ACTION</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {filteredScans.map(
-                      (scan, index) => {
-                        const verdict =
-                          getVerdict(scan);
-
-                        return (
-                          <tr
-                            key={
-                              scan._id ||
-                              `scan-${index}`
-                            }
-                          >
-                            <td>
-                              {index + 1}
-                            </td>
-
-                            <td>
-                              <span className="scan-type">
-                                {getScanType(
-                                  scan
-                                )}
-                              </span>
-                            </td>
-
-                            <td
-                              title={
-                                getUserEmail(
-                                  scan
-                                )
-                              }
-                            >
-                              {getUserEmail(
-                                scan
-                              )}
-                            </td>
-
-                            <td
-                              title={
-                                scan.url ||
-                                ""
-                              }
-                              style={{
-                                maxWidth:
-                                  "250px",
-                                overflow:
-                                  "hidden",
-                                textOverflow:
-                                  "ellipsis",
-                              }}
-                            >
-                              {scan.url ||
-                                "N/A"}
-                            </td>
-
-                            <td>
-                              <strong>
-                                {scan.riskScore ??
-                                  0}
-                                %
-                              </strong>
-                            </td>
-
-                            <td>
-                              <span
-                                className={
-                                  verdict ===
-                                  "SAFE"
-                                    ? "admin-safe"
-                                    : verdict ===
-                                      "THREAT"
-                                    ? "admin-threat"
-                                    : "admin-uncertain"
-                                }
-                              >
-                                {verdict}
-                              </span>
-                            </td>
-
-                            <td>
-                              {formatDate(
-                                scan.createdAt
-                              )}
-                            </td>
-                            {/* DELETE BUTTON */}
-<td>
-  <button
-    type="button"
-    onClick={() =>
-      handleDeleteScan(scan._id)
-    }
-    disabled={
-      deletingScanId === scan._id
-    }
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      justifyContent: "center",
-      padding: "9px 16px",
-      minWidth: "90px",
-      background:
-        "rgba(255, 23, 68, 0.15)",
-      color: "#ff1744",
-      border:
-        "1px solid #ff1744",
-      borderRadius: "7px",
-      fontFamily:
-        '"Courier New", monospace',
-      fontSize: "12px",
-      fontWeight: "bold",
-      cursor:
-        deletingScanId === scan._id
-          ? "not-allowed"
-          : "pointer",
-    }}
-  >
-    {deletingScanId === scan._id
-      ? "DELETING..."
-      : "🗑 DELETE"}
-  </button>
-</td>
-
-</tr>
-                          
-                        );
-                      }
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-
-          {/* =================================================
-              REFRESH
-          ================================================= */}
-
-          <button
-            className="admin-refresh"
-            onClick={
-              loadAdminData
-            }
-            disabled={loading}
-          >
-            {loading
-              ? "↻ LOADING..."
-              : "↻ REFRESH ADMIN DATA"}
-          </button>
+          {/* TAB: PERMISSIONS */}
+          {activeTab === 'permissions' && <PermissionsPanel />}
         </>
       )}
     </main>

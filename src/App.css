@@ -3859,17 +3859,35 @@ html.light-mode .logged-navbar .nav-button.active {
   background: #007c91 !important;
   border-color: #007c91 !important;
 }
-
 /* =========================================================
-   THEME TOGGLE
+   LIGHT MODE — NAVBAR BUTTONS + TOGGLE SAME
 ========================================================= */
 
-html.light-mode .theme-toggle {
-  color: #ffffff !important;
-  background: #007c91 !important;
-  border: 1px solid #007c91 !important;
+/* Navbar ke sab buttons + Toggle ek jese */
+html.light-mode .navbar .nav-button,
+html.light-mode .public-navbar .nav-button,
+html.light-mode .logged-navbar .nav-button,
+html.light-mode .theme-toggle { /* <-- Toggle bhi is me shamil */
+  color: #007c91 !important;
+  background: #eaf8fb !important;
+  border: 1px solid #9ed3df !important;
+  box-shadow: none !important;
+  padding: 8px 12px !important; /* size bhi same */
+  border-radius: 8px !important;
 }
 
+/* Active / Hover sab ke liye same */
+html.light-mode .navbar .nav-button:hover,
+html.light-mode .navbar .nav-button.active,
+html.light-mode .public-navbar .nav-button:hover,
+html.light-mode .public-navbar .nav-button.active,
+html.light-mode .logged-navbar .nav-button:hover,
+html.light-mode .logged-navbar .nav-button.active,
+html.light-mode .theme-toggle:hover { /* <-- Toggle hover bhi same */
+  color: #ffffff !important;
+  background: #007c91 !important;
+  border-color: #007c91 !important;
+}
 /* =========================================================
    DELETE SCAN — BLUE
 ========================================================= */
