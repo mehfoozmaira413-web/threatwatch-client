@@ -4036,120 +4036,75 @@ html.light-mode .delete-btn:hover {
   border-color: #00f0ff;
   box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
 }
-/* ============ ADMIN TAB BUTTONS - LIGHT vs DARK ============ */
+/* ============ ADMIN TABS FINAL - NO CONFLICT ============ */
 
-/* Common */
+/* Wrapper */
 .admin-page .admin-hero + div {
-  margin-top: 30px !important;
-  margin-bottom: 25px !important;
-  display: flex !important;
-  gap: 15px !important;
+  margin-top: 30px;
+  margin-bottom: 25px;
+  display: flex;
+  gap: 15px;
 }
 
+/* Base */
 .admin-page .admin-hero + div button {
-  font-family: 'Orbitron', 'Courier New', monospace !important;
-  font-size: 13px !important;
-  font-weight: bold !important;
-  letter-spacing: 1.5px !important;
-  padding: 12px 24px !important;
-  border-radius: 10px !important;
-  cursor: pointer !important;
-  transition: all 0.3s ease !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 8px !important;
+  font-family: 'Orbitron', 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+  padding: 12px 24px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 /* ICONS */
 .admin-page .admin-hero + div button:first-child::before { content: "◈"; font-size: 16px; }
 .admin-page .admin-hero + div button:last-child::before { content: "🛡"; font-size: 16px; }
 
-/* ===== DARK MODE: Blue Glow Cyber Look ===== */
-.dark .admin-page .admin-hero + div button,
-[data-theme="dark"] .admin-page .admin-hero + div button {
-  background: rgba(8, 18, 35, 0.7) !important;
-  border: 1px solid rgba(0, 240, 255, 0.3) !important;
-  color: #00f0ff !important;
-  text-shadow: 0 0 6px rgba(0, 240, 255, 0.5) !important;
-  backdrop-filter: blur(10px) !important;
-  box-shadow: none !important;
+/* DARK MODE */
+html.dark .admin-page .admin-hero + div button {
+  background: rgba(8, 18, 35, 0.7);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: #00f0ff;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.5);
+  backdrop-filter: blur(10px);
 }
 
-.dark .admin-page .admin-hero + div button:hover,
-[data-theme="dark"] .admin-page .admin-hero + div button:hover {
-  background: rgba(0, 240, 255, 0.15) !important;
-  border-color: #00f0ff !important;
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5) !important;
-  transform: translateY(-3px) !important;
+html.dark .admin-page .admin-hero + div button:first-child {
+  background: rgba(0, 240, 255, 0.25);
+  border-color: #00f0ff;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.7);
+  color: #ffffff;
 }
 
-.dark .admin-page .admin-hero + div button:first-child,
-[data-theme="dark"] .admin-page .admin-hero + div button:first-child {
-  background: rgba(0, 240, 255, 0.25) !important;
-  border-color: #00f0ff !important;
-  box-shadow: 0 0 25px rgba(0, 240, 255, 0.7) !important;
-  color: #ffffff !important;
+html.dark .admin-page .admin-hero + div button:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: #00f0ff;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5);
+  transform: translateY(-3px);
 }
 
-/* ===== LIGHT MODE: Clean Grey/Blue Look ===== */
-body:not(.dark):not([data-theme="dark"]) .admin-page .admin-hero + div button,
-[data-theme="light"] .admin-page .admin-hero + div button {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #475569 !important;
-  text-shadow: none !important;
-  backdrop-filter: none !important;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+/* LIGHT MODE */
+html:not(.dark) .admin-page .admin-hero + div button {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
-body:not(.dark):not([data-theme="dark"]) .admin-page .admin-hero + div button:hover,
-[data-theme="light"] .admin-page .admin-hero + div button:hover {
-  background: #e2e8f0 !important;
-  border-color: #94a3b8 !important;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
-  transform: translateY(-2px) !important;
+html:not(.dark) .admin-page .admin-hero + div button:first-child {
+  background: #3b82f6;
+  border-color: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
-body:not(.dark):not([data-theme="dark"]) .admin-page .admin-hero + div button:first-child,
-[data-theme="light"] .admin-page .admin-hero + div button:first-child {
-  background: #3b82f6 !important;
-  border-color: #2563eb !important;
-  color: #ffffff !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
-}
-/* ============ FORCE OVERRIDE ADMIN TABS ============ */
-
-/* DARK MODE FORCE */
-html.dark .admin-page .admin-hero + div > button,
-html[data-theme="dark"] .admin-page .admin-hero + div > button {
-  background: rgba(8, 18, 35, 0.8) !important;
-  border: 1px solid #00f0ff !important;
-  color: #00f0ff !important;
-  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6) !important;
-  backdrop-filter: blur(10px) !important;
-}
-
-html.dark .admin-page .admin-hero + div > button:first-child,
-html[data-theme="dark"] .admin-page .admin-hero + div > button:first-child {
-  background: rgba(0, 240, 255, 0.3) !important;
-  box-shadow: 0 0 30px rgba(0, 240, 255, 0.8) !important;
-  color: #fff !important;
-}
-
-/* LIGHT MODE FORCE */
-html:not(.dark) .admin-page .admin-hero + div > button,
-html[data-theme="light"] .admin-page .admin-hero + div > button {
-  background: #f1f5f9 !important;
-  border: 1px solid #cbd5e1 !important;
-  color: #475569 !important;
-  text-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-html:not(.dark) .admin-page .admin-hero + div > button:first-child,
-html[data-theme="light"] .admin-page .admin-hero + div > button:first-child {
-  background: #3b82f6 !important;
-  border-color: #2563eb !important;
-  color: #fff !important;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+html:not(.dark) .admin-page .admin-hero + div button:hover {
+  background: #e2e8f0;
+  border-color: #94a3b8;
+  transform: translateY(-2px);
 }
