@@ -2883,36 +2883,65 @@ function ModeratorPage({ realtimeTick }) {
     canDelete: false
   });
   const [permLoading, setPermLoading] = useState(true);
+// =====================================================
+// LOAD MY PERMISSIONS
+// =====================================================
+const loadPermissions = async () => {
+  try {
+    setPermLoading(true);
 
-  // =====================================================
-  // 1. PERMISSIONS FETCH KARO PAGE LOAD PE
-  // =====================================================
-  useEffect(() => {
-    const fetchPermissions = async () => {
-      try {
-        const token = getToken();
-        if (!token) return;
+    const token = getToken();
 
-       const res = await axios.get(`${API_URL}/api/admin/permissions/me`, {
-  headers: {
-    Authorization: `Bearer ${token}`
-  }
-});
+    if (!token) {
+      setPermissions({
+        canFlag: false,
+        canDelete: false,
+      });
+      return;
+    }
 
-if (res.data.success) {
-  setPermissions({
-    canFlag: Boolean(res.data.permissions?.canFlag),
-    canDelete: Boolean(res.data.permissions?.canDelete)
-  });
-}
-      } catch (err) {
-        console.error("Failed to fetch permissions", err);
-      } finally {
-        setPermLoading(false);
+    const response = await fetch(
+      `${API_URL}/api/admin/permissions/me`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
       }
-    };
-    fetchPermissions();
-  }, []);
+    );
+
+    const data = await readResponse(response);
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Failed to load permissions."
+      );
+    }
+
+    setPermissions({
+      canFlag: Boolean(data.permissions?.canFlag),
+      canDelete: Boolean(data.permissions?.canDelete),
+    });
+
+  } catch (error) {
+    console.error("PERMISSIONS ERROR:", error);
+
+    setPermissions({
+      canFlag: false,
+      canDelete: false,
+    });
+
+  } finally {
+    setPermLoading(false);
+  }
+};
+
+// =====================================================
+// LOAD PERMISSIONS ON PAGE LOAD
+// =====================================================
+useEffect(() => {
+  loadPermissions();
+}, []);
 
   // =====================================================
   // FLAG SCAN AS THREAT
@@ -3857,26 +3886,44 @@ function App() {
   ]);
 
   /* =====================================================
-   FETCH PERMISSIONS
+   FETCH MY PERMISSIONS
 ===================================================== */
 
 useEffect(() => {
-  if(!loggedIn || !getToken() || !role) return;
+  if (!loggedIn || !getToken() || !role) return;
 
   const loadPermissions = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/admin/permissions`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-      });
+      const response = await fetch(
+        `${API_URL}/api/admin/permissions/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${getToken()}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
       const data = await readResponse(response);
-      if(response.ok && data.permissions) {
-        const myPerm = data.permissions.find(p => normalizeRole(p.role) === role);
-        setPermissions(myPerm?.permissions || {});
+
+      if (!response.ok) {
+        console.error(
+          "PERMISSIONS API ERROR:",
+          data.message || "Failed to load permissions"
+        );
+
+        setPermissions({});
+        return;
       }
-    } catch(error) {
+
+      setPermissions(data.permissions || {});
+
+    } catch (error) {
       console.error("PERMISSIONS ERROR:", error);
+      setPermissions({});
     }
   };
+
   loadPermissions();
 }, [loggedIn, role]);
 
