@@ -2054,6 +2054,66 @@ function History({
     useState("ALL");
 
 const [deletingId, setDeletingId] = useState(null);
+const [permissions, setPermissions] = useState({
+  canFlag: false,
+  canDelete: false,
+});
+
+const [permLoading, setPermLoading] = useState(true);
+
+// =====================================================
+// LOAD MY PERMISSIONS
+// =====================================================
+useEffect(() => {
+  const loadPermissions = async () => {
+    try {
+      setPermLoading(true);
+
+      const token = getToken();
+
+      if (!token) {
+        setPermissions({});
+        return;
+      }
+
+      const response = await fetch(
+        `${API_URL}/api/admin/permissions/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
+        }
+      );
+
+      const data = await readResponse(response);
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || "Failed to load permissions."
+        );
+      }
+
+      setPermissions({
+        canFlag: Boolean(data.permissions?.canFlag),
+        canDelete: Boolean(data.permissions?.canDelete),
+      });
+
+    } catch (error) {
+      console.error("PERMISSIONS ERROR:", error);
+
+      setPermissions({
+        canFlag: false,
+        canDelete: false,
+      });
+    } finally {
+      setPermLoading(false);
+    }
+  };
+
+  loadPermissions();
+}, []);
+
 
   const loadHistory =
     async () => {
@@ -2131,6 +2191,80 @@ const [deletingId, setDeletingId] = useState(null);
         setLoading(false);
       }
     };
+
+    // =====================================================
+// FLAG USER'S SCAN AS THREAT
+// =====================================================
+const handleFlagScan = async (scanId) => {
+  const reason = window.prompt(
+    "🚩 Why are you flagging this scan as a threat?"
+  );
+
+  if (reason === null) return;
+
+  const cleanReason = reason.trim();
+
+  if (!cleanReason) {
+    alert("Please enter a reason before flagging the scan.");
+    return;
+  }
+
+  const token = getToken();
+
+  if (!token) {
+    setError("Please login again.");
+    return;
+  }
+
+  try {
+    setError("");
+
+    const response = await fetch(
+      `${API_URL}/api/moderator/scans/${scanId}/flag`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          reason: cleanReason,
+        }),
+      }
+    );
+
+    const data = await readResponse(response);
+
+    if (!response.ok) {
+      throw new Error(
+        data.message || "Failed to flag scan."
+      );
+    }
+
+    setScans((previousScans) =>
+      previousScans.map((scan) =>
+        scan._id === scanId
+          ? {
+              ...scan,
+              isFlagged: true,
+              flagReason: cleanReason,
+              flaggedAt: new Date().toISOString(),
+            }
+          : scan
+      )
+    );
+
+    alert("🚩 Scan flagged successfully.");
+
+  } catch (err) {
+    console.error("FLAG SCAN ERROR:", err);
+
+    setError(
+      err.message || "Unable to flag scan."
+    );
+  }
+};
 
     // =====================================================
 // DELETE USER'S OWN SCAN
@@ -2600,25 +2734,56 @@ const handleDeleteScan = async (scanId) => {
                    {/* =========================================
     DELETE SCAN
 ========================================= */}
-
 <div className="history-actions">
 
-  <button
-    type="button"
-    className="delete-history-btn"
-    onClick={() =>
-      handleDeleteScan(scan._id)
-    }
-    disabled={
-      deletingId === scan._id
-    }
-  >
-    {deletingId === scan._id
-      ? "DELETING..."
-      : "🗑 DELETE SCAN"}
-  </button>
+  {/* =========================================
+      FLAG THREAT
+  ========================================= */}
+  {permissions.canFlag && !scan.isFlagged && (
+    <button
+      type="button"
+      className="flag-threat-btn"
+      onClick={() => handleFlagScan(scan._id)}
+    >
+      🚩 FLAG THREAT
+    </button>
+  )}
 
-</div> 
+  {scan.isFlagged && (
+    <span
+      className="flagged-history-badge"
+      title={
+        scan.flagReason ||
+        "Flagged as threat"
+      }
+    >
+      🚩 FLAGGED
+    </span>
+  )}
+
+  {/* =========================================
+      DELETE SCAN
+  ========================================= */}
+  {permissions.canDelete && (
+    <button
+      type="button"
+      className="delete-history-btn"
+      onClick={() =>
+        handleDeleteScan(scan._id)
+      }
+      disabled={
+        deletingId === scan._id
+      }
+    >
+      {deletingId === scan._id
+        ? "DELETING..."
+        : "🗑 DELETE SCAN"}
+    </button>
+  )}
+
+</div>
+
+
                   </article>
                 );
               }
