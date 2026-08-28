@@ -4117,3 +4117,39 @@ body:not(.dark):not([data-theme="dark"]) .admin-page .admin-hero + div button:fi
   color: #ffffff !important;
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
 }
+/* ============ FORCE OVERRIDE ADMIN TABS ============ */
+
+/* DARK MODE FORCE */
+html.dark .admin-page .admin-hero + div > button,
+html[data-theme="dark"] .admin-page .admin-hero + div > button {
+  background: rgba(8, 18, 35, 0.8) !important;
+  border: 1px solid #00f0ff !important;
+  color: #00f0ff !important;
+  text-shadow: 0 0 8px rgba(0, 240, 255, 0.6) !important;
+  backdrop-filter: blur(10px) !important;
+}
+
+html.dark .admin-page .admin-hero + div > button:first-child,
+html[data-theme="dark"] .admin-page .admin-hero + div > button:first-child {
+  background: rgba(0, 240, 255, 0.3) !important;
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.8) !important;
+  color: #fff !important;
+}
+
+/* LIGHT MODE FORCE */
+html:not(.dark) .admin-page .admin-hero + div > button,
+html[data-theme="light"] .admin-page .admin-hero + div > button {
+  background: #f1f5f9 !important;
+  border: 1px solid #cbd5e1 !important;
+  color: #475569 !important;
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+html:not(.dark) .admin-page .admin-hero + div > button:first-child,
+html[data-theme="light"] .admin-page .admin-hero + div > button:first-child {
+  background: #3b82f6 !important;
+  border-color: #2563eb !important;
+  color: #fff !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4) !important;
+}
