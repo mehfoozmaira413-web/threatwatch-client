@@ -2893,16 +2893,18 @@ function ModeratorPage({ realtimeTick }) {
         const token = getToken();
         if (!token) return;
 
-        const res = await axios.get(`${API_URL}/api/admin/permissions`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+       const res = await axios.get(`${API_URL}/api/admin/permissions/me`, {
+  headers: {
+    Authorization: `Bearer ${token}`
+  }
+});
 
-        if (res.data.success) {
-          const modPerms = res.data.permissions.find(p => p.role === 'Moderator');
-          if (modPerms) {
-            setPermissions(modPerms.permissions);
-          }
-        }
+if (res.data.success) {
+  setPermissions({
+    canFlag: Boolean(res.data.permissions?.canFlag),
+    canDelete: Boolean(res.data.permissions?.canDelete)
+  });
+}
       } catch (err) {
         console.error("Failed to fetch permissions", err);
       } finally {
@@ -3317,7 +3319,7 @@ function AdminPage() {
         fetch(`${API_URL}/api/admin/users`, { headers }),
         fetch(`${API_URL}/api/admin/scans`, { headers }),
         fetch(`${API_URL}/api/admin/stats`, { headers }),
-        fetch(`${API_URL}/api/moderator/flags`, { headers }),
+        fetch(`${API_URL}/api/admin/flags`, { headers }),
       ]);
       const usersData = await readResponse(usersResponse);
       const scansData = await readResponse(scansResponse);
