@@ -4036,3 +4036,61 @@ html.light-mode .delete-btn:hover {
   border-color: #00f0ff;
   box-shadow: 0 0 20px rgba(0, 240, 255, 0.6);
 }
+/* ============ ADMIN TAB BUTTONS FIX - ONLY CSS ============ */
+
+/* Buttons ke wrapper ko neechey karne ke liye */
+.admin-page .admin-hero + div {
+  margin-top: 30px !important;
+  margin-bottom: 25px !important;
+  display: flex !important;
+  gap: 15px !important;
+}
+
+/* OVERVIEW aur PERMISSIONS buttons ka style */
+.admin-page .admin-hero + div button {
+  background: rgba(8, 18, 35, 0.7) !important;
+  border: 1px solid rgba(0, 240, 255, 0.3) !important;
+  color: #00f0ff !important;
+  font-family: 'Orbitron', 'Courier New', monospace !important;
+  font-size: 13px !important;
+  font-weight: bold !important;
+  letter-spacing: 1.5px !important;
+  padding: 12px 24px 12px 20px !important;
+  border-radius: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.3s ease !important;
+  text-shadow: 0 0 6px rgba(0, 240, 255, 0.5) !important;
+  backdrop-filter: blur(10px) !important;
+  position: relative !important;
+}
+
+/* Hover effect */
+.admin-page .admin-hero + div button:hover {
+  background: rgba(0, 240, 255, 0.15) !important;
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.5) !important;
+  transform: translateY(-3px) !important;
+}
+
+/* Active button - OVERVIEW wala */
+.admin-page .admin-hero + div button:first-child {
+  background: rgba(0, 240, 255, 0.25) !important;
+  border-color: #00f0ff !important;
+  box-shadow: 0 0 25px rgba(0, 240, 255, 0.7) !important;
+  color: #ffffff !important;
+}
+
+/* ICONS add karne ke liye ::before use kiya */
+.admin-page .admin-hero + div button:first-child::before {
+  content: "◈ "; /* Overview icon */
+  font-size: 16px;
+  margin-right: 6px;
+  filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+}
+
+.admin-page .admin-hero + div button:last-child::before {
+  content: "🛡 "; /* Permissions icon */
+  font-size: 16px;
+  margin-right: 6px;
+  filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+}
