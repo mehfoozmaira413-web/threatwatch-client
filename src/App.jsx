@@ -3399,22 +3399,23 @@ function PermissionsPanel() {
             {roles.map(role => (
               <tr key={role.role}>
                 <td><strong>{role.role}</strong></td>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={role.permissions.canFlag}
-                    onChange={() => handleToggle(role.role, 'canFlag')}
-                    disabled={role.role === 'Admin'} // Admin ko lock
-                  />
-                </td>
-                <td>
-                  <input
-                    type="checkbox"
-                    checked={role.permissions.canDelete}
-                    onChange={() => handleToggle(role.role, 'canDelete')}
-                    disabled={role.role === 'Admin'}
-                  />
-                </td>
+                
+                <td> 
+  <input 
+    type="checkbox" 
+    checked={Boolean(role.permissions?.canFlag)} 
+    onChange={() => handleToggle(role.role, "canFlag")} 
+  /> 
+</td> 
+
+<td> 
+  <input 
+    type="checkbox" 
+    checked={Boolean(role.permissions?.canDelete)} 
+    onChange={() => handleToggle(role.role, "canDelete")} 
+  /> 
+</td>
+
               </tr>
             ))}
           </tbody>
